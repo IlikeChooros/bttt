@@ -6,8 +6,13 @@ import (
 )
 
 func main() {
-	b := bttt.NewBoard()
-	b.MakeMove(0, 5)
+	p := bttt.NewPosition()
 
-	fmt.Println(b.Board())
+	fmt.Println(p.Moves())
+	fmt.Println(p.Position())
+
+	p.GenerateMoves()
+	fmt.Println(p.Moves())
+
+	fmt.Println(p.Notation())
 }

@@ -1,20 +1,37 @@
 package bttt
 
-// Type defines for the board
-type pieceType int8
-type turnType bool
-type posType uint8
-type boardType [9][9]pieceType
+// Type defines for the position
+type PieceType int8
+type TurnType bool
+type PosType uint8
+type BoardType [9][9]PieceType
+
+// Enum for position
+const (
+	posIllegal PosType = 255
+)
 
 // Enum for the piece type
 const (
-	None pieceType = iota
-	Circle
-	Cross
+	PieceNone PieceType = iota
+	PieceCircle
+	PieceCross
 )
 
 // Enum for the turns
 const (
-	CicrleTurn turnType = true
-	CrossTurn  turnType = false
+	CircleTurn TurnType = true
+	CrossTurn  TurnType = false
 )
+
+// Create piece from a rune
+func PieceFromRune(square rune) PieceType {
+	switch square {
+	case 'x':
+		return PieceCross
+	case 'o':
+		return PieceCircle
+	default:
+		return PieceNone
+	}
+}

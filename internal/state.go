@@ -1,12 +1,11 @@
 package bttt
 
 type BoardState struct {
-	move     Move
-	turn     turnType
-	bigIndex posType
+	move PosType
+	turn TurnType
 }
 
-// Stores the history of the board as a slice of BoardState
+// Stores the history of the position as a slice of BoardState
 type StateList struct {
 	list []BoardState
 }
@@ -15,15 +14,36 @@ type StateList struct {
 func NewStateList() *StateList {
 	sl := new(StateList)
 	sl.list = make([]BoardState, 0, 10)
+	sl.Append(posIllegal, CrossTurn)
 	return sl
 }
 
 // Append new state
-func (sl *StateList) Append(state BoardState) {
-	sl.list = append(sl.list, state)
+func (sl *StateList) Append(move PosType, turn TurnType) {
+	sl.list = append(sl.list, BoardState{move, turn})
 }
 
 // Remove last state
 func (sl *StateList) Remove() {
 	sl.list = sl.list[:len(sl.list)-1]
+}
+
+// Get actual size of the history
+func (sl *StateList) ValidSize() int {
+	return len(sl.list) - 1
+}
+
+// Get the last element of the state list (current state of the board)
+func (sl *StateList) Last() *BoardState {
+	return &sl.list[len(sl.list)-1]
+}
+
+// Get last move's Big Index
+func (sl *StateList) BigIndex() PosType {
+	return sl.Last().move.BigIndex()
+}
+
+// Same as SmallIndex
+func (sl *StateList) NextBigIndex() PosType {
+	return sl.Last().move.SmallIndex()
 }
