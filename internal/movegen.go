@@ -1,25 +1,27 @@
 package bttt
 
-func (pos *Position) _GenerateMoves(bigIndex int) {
+func (pos *Position) _GenerateMoves(movelist *MoveList, bigIndex int) {
 	// Go through each cell, and pick empty ones
 	for position, v := range pos.position[bigIndex] {
 		if v == PieceNone {
-			pos.moves.Append(bigIndex, position)
+			movelist.Append(bigIndex, position)
 		}
 	}
 }
 
 // Generate all possible moves in given position
-func (pos *Position) GenerateMoves() {
+func (pos *Position) GenerateMoves() *MoveList {
+	movelist := NewMoveList()
 
 	// If there is no history, we can choose also the 'Big Index' position
 	if pos.stateList.ValidSize() == 0 {
 		for i := 0; i < 9; i++ {
-			pos._GenerateMoves(i)
+			pos._GenerateMoves(movelist, i)
 		}
-		return
+	} else {
+		// Else we generate moves for the 'Big Index' position
+		pos._GenerateMoves(movelist, pos.BigIndex())
 	}
 
-	// Else we generate moves for the 'Big Index' position
-	pos._GenerateMoves(pos.BigIndex())
+	return movelist
 }

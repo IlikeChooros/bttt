@@ -24,12 +24,22 @@ func MakeMove(bigIndex, smallIndex int) PosType {
 
 // Get the big index of a move
 func (pos PosType) BigIndex() PosType {
-	return pos & _moveBigIndexMask
+	return (pos & _moveBigIndexMask) >> 4
 }
 
 // Get the small index of tic tac toe board
 func (pos PosType) SmallIndex() PosType {
 	return pos & _moveSmallIndexMask
+}
+
+// Reset the movelist, simply sets the size to 0
+func (ml *MoveList) Clear() {
+	ml.size = 0
+}
+
+// Get the actual slice of valid moves
+func (ml *MoveList) Slice() []PosType {
+	return ml.moves[0:ml.size]
 }
 
 // Appends a new move to the list of moves

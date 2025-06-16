@@ -19,7 +19,7 @@ func TestMakeMove(t *testing.T) {
 func TestBigIndex(t *testing.T) {
 	move := MakeMove(5, 7)
 	big := move.BigIndex()
-	expectedBig := PosType((5 << 4) & _moveBigIndexMask)
+	expectedBig := PosType(5)
 
 	if big != expectedBig {
 		t.Errorf("BigIndex() = %v; want %v", big, expectedBig)

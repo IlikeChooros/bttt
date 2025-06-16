@@ -1,18 +1,14 @@
 package main
 
 import (
-	"bttt/internal"
-	"fmt"
+	bttt "bttt/internal"
 )
 
 func main() {
-	p := bttt.NewPosition()
+	depths := []int{1, 2, 3, 4, 5, 6}
 
-	fmt.Println(p.Moves())
-	fmt.Println(p.Position())
-
-	p.GenerateMoves()
-	fmt.Println(p.Moves())
-
-	fmt.Println(p.Notation())
+	pos := bttt.NewPosition()
+	for _, depth := range depths {
+		bttt.Perft(pos, depth)
+	}
 }

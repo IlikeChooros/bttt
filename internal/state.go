@@ -13,14 +13,25 @@ type StateList struct {
 // Get new StateList object
 func NewStateList() *StateList {
 	sl := new(StateList)
+	sl.Init()
+	return sl
+}
+
+// Initialize the state list, for example after calling 'Clear'
+func (sl *StateList) Init() {
 	sl.list = make([]BoardState, 0, 10)
 	sl.Append(posIllegal, CrossTurn)
-	return sl
 }
 
 // Append new state
 func (sl *StateList) Append(move PosType, turn TurnType) {
 	sl.list = append(sl.list, BoardState{move, turn})
+}
+
+// Reset all states (remove them)
+func (sl *StateList) Clear() {
+	sl.list = nil
+	sl.Init()
 }
 
 // Remove last state

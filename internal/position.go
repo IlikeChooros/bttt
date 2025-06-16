@@ -1,10 +1,15 @@
 package bttt
 
+// Constants
+
+const (
+	StartingPosition string = "9/9/9/9/9/9/9/9/9 o -"
+)
+
 // Main position struct
 type Position struct {
 	position  BoardType  // 2d array of the pieces [bigIndex][smallIndex]
 	stateList *StateList // history of the position (for MakeMove, UndoMove)
-	moves     *MoveList  // all possible moves in given position
 }
 
 // Create a heap-allocated, initialized Big Tic Tac Toe position
@@ -17,7 +22,17 @@ func NewPosition() *Position {
 // Initialize the position
 func (b *Position) Init() {
 	b.stateList = NewStateList()
-	b.moves = NewMoveList()
+}
+
+func (p *Position) Reset() {
+	p.stateList.Clear()
+
+	// Zero the board
+	for i := range p.position {
+		for j := range p.position[i] {
+			p.position[i][j] = PieceNone
+		}
+	}
 }
 
 // Getters
@@ -26,16 +41,11 @@ func (b *Position) Position() BoardType {
 }
 
 func (b *Position) Turn() TurnType {
-	return b.stateList.Last().turn
+	return !b.stateList.Last().turn
 }
 
 func (p *Position) BigIndex() int {
 	return int(p.stateList.NextBigIndex())
-}
-
-// Get pointer to the MoveList struct, holding generated legal moves
-func (p *Position) Moves() *MoveList {
-	return p.moves
 }
 
 // Make a move on the position, switches the sides, and puts current piece
@@ -50,17 +60,19 @@ func (p *Position) MakeMove(move PosType) {
 	}
 
 	// Choose the piece, based on the current side to move
-	piece := PieceCircle
+	piece := PieceCross
 	lastState := p.stateList.Last()
+
+	// Meaning last turn, cross made a move, so now it's circle's turn
 	if !lastState.turn {
-		piece = PieceCross
+		piece = PieceCircle
 	}
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
 
 	// Append new state
-	p.stateList.Append(move, !p.Turn())
+	p.stateList.Append(move, !lastState.turn)
 }
 
 // Undo last move, from the state list

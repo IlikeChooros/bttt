@@ -8,7 +8,8 @@ type BoardType [9][9]PieceType
 
 // Enum for position
 const (
-	posIllegal PosType = 255
+	posIllegal      PosType = 255
+	posIndexIllegal PosType = 15 // same as big/small index mask
 )
 
 // Enum for the piece type
