@@ -6,4 +6,5 @@ search best move, based on given parameteres
 */
 type Engine struct {
 	position *Position
+	limits   Limits
 }

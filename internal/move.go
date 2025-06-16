@@ -22,16 +22,6 @@ func MakeMove(bigIndex, smallIndex int) PosType {
 	return PosType((smallIndex & _moveSmallIndexMask) | ((bigIndex << 4) & _moveBigIndexMask))
 }
 
-// Get the big index of a move
-func (pos PosType) BigIndex() PosType {
-	return (pos & _moveBigIndexMask) >> 4
-}
-
-// Get the small index of tic tac toe board
-func (pos PosType) SmallIndex() PosType {
-	return pos & _moveSmallIndexMask
-}
-
 // Reset the movelist, simply sets the size to 0
 func (ml *MoveList) Clear() {
 	ml.size = 0
