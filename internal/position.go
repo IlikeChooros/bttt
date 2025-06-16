@@ -30,7 +30,7 @@ func (b *Position) Turn() TurnType {
 }
 
 func (p *Position) BigIndex() int {
-	return int(p.stateList.BigIndex())
+	return int(p.stateList.NextBigIndex())
 }
 
 // Get pointer to the MoveList struct, holding generated legal moves
