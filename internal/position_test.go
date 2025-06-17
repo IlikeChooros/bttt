@@ -6,6 +6,9 @@ import (
 
 func TestPositionInit(t *testing.T) {
 	p := NewPosition()
+
+	// Run sub test, simply check if there is no thistory, and
+	// and Big Index is not set
 	test := func(t *testing.T) {
 		if p.stateList.ValidSize() != 0 {
 			t.Error("p.stateList.ValidSize() != 0")

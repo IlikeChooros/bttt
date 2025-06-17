@@ -17,6 +17,9 @@ func TestInitNotation(t *testing.T) {
 }
 
 func TestNotations(t *testing.T) {
+	// Check if after setting given position, I will
+	// get the same notation as the input one
+
 	notations := []string{
 		StartingPosition,
 		"1o7/2x6/o8/9/9/9/9/9/9 x -",
@@ -45,6 +48,9 @@ func TestNotations(t *testing.T) {
 }
 
 func TestInitPositionNotations(t *testing.T) {
+	// Simply check if after making specified moves, from starting position
+	// I will get given notation strings
+
 	// In future I may add more of these
 	notations := []string{
 		"1o7/2x6/o8/9/9/9/9/9/9 x 0",

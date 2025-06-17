@@ -7,6 +7,7 @@ type PieceType int8
 type TurnType bool
 type PosType uint8
 type BoardType [9][9]PieceType
+type PositionState uint8
 
 // Type defines for search/limits
 type Depth int
@@ -20,6 +21,13 @@ const (
 const (
 	posIllegal      PosType = 255
 	posIndexIllegal PosType = 15 // same as big/small index mask
+)
+
+const (
+	PositionUnResolved PositionState = iota
+	PositionDraw
+	PositionCircleWon
+	PositionCrossWon
 )
 
 // Enum for the piece type

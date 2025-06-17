@@ -2,4 +2,12 @@ Big Tic Tac Toe in Go:
 - [x] Make movelist struct:
   - [x] Holds all moves (`[]Move`)
   - [x] can return a range of moves
-- [ ] Make a move generator
+- [x] Make a move generator
+- [ ] Optimization:
+  - [ ] Evaluation: 
+    - [ ] Make the board hold also bitboards for each square (so we don't have to calculate them every time)
+  - [ ] Search:
+    - [ ] Use transposition tables
+    - [ ] Add move ordering
+    - [ ] Use killer moves
+    - [ ] Use history heuristic

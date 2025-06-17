@@ -8,8 +8,10 @@ const (
 
 // Main position struct
 type Position struct {
-	position  BoardType  // 2d array of the pieces [bigIndex][smallIndex]
-	stateList *StateList // history of the position (for MakeMove, UndoMove)
+	position         BoardType        // 2d array of the pieces [bigIndex][smallIndex]
+	bigPositionState [9]PositionState // Array of uint8's, where each one means, either cross, circle or no one won on that square
+	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
+	termination      Termination
 }
 
 // Create a heap-allocated, initialized Big Tic Tac Toe position

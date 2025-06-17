@@ -82,6 +82,9 @@ func TestMakeUndoMoves(t *testing.T) {
 }
 
 func TestPerft(t *testing.T) {
+	// Check if move generation is working correctly -
+	// and creates specified number of children nodes from the starting position
+
 	// First 3 proved mathematically, next values looks good as well
 	valid_nodes := []uint64{
 		81, 720, 6336, 55080, 473256,
