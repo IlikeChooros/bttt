@@ -16,6 +16,25 @@ func TestInitNotation(t *testing.T) {
 	}
 }
 
+func TestInvalidNotations(t *testing.T) {
+	invalid_notations := []string{
+		"", "hello world",
+		"9/9/9/9/9/9/9/9/9 o",
+		"9/9/9/9/9/AAA/9/9/9 o -",
+		"9/9/9/9/9/xox5/9/9/9",
+		"9/9/9/9/9/5/9/9/9 o -",
+	}
+
+	pos := NewPosition()
+	for _, invalid := range invalid_notations {
+		err := pos.FromNotation(invalid)
+
+		if err == nil {
+			t.Errorf("Expected error on %s", invalid)
+		}
+	}
+}
+
 func TestNotations(t *testing.T) {
 	// Check if after setting given position, I will
 	// get the same notation as the input one

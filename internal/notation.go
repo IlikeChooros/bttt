@@ -94,7 +94,7 @@ func (p *Position) Notation() string {
 }
 
 // Create the position from given notation string, will reset current state,
-// and load the position
+// load current position and setup termination flags
 func (p *Position) FromNotation(notation string) error {
 	// Reset history and generated moves
 	p.Reset()
@@ -153,6 +153,11 @@ func _FromNotation(pos *Position, notation string) error {
 			board[bigIndex][smallIndex] = PieceFromRune(v)
 			smallIndex++
 		case '/':
+			// Small index must be 9, before moving on to next square
+			if smallIndex != 9 {
+				return fmt.Errorf("Invalid number of squares within bigIndex=%d", bigIndex)
+			}
+
 			// New square, increase the bigIndex counter
 			bigIndex++
 			smallIndex = 0
@@ -187,5 +192,8 @@ func _FromNotation(pos *Position, notation string) error {
 		return fmt.Errorf("Invalid big index %c, expected a digit 0-8", v)
 	}
 
+	// Setup the position state
+	pos.SetupBoardState()
+	pos.CheckTerminationPattern()
 	return nil
 }
