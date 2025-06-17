@@ -6,12 +6,9 @@ import (
 )
 
 func main() {
-	depths := []int{1, 2, 3, 4, 5, 6, 7}
-
-	pos := bttt.NewPosition()
-	for _, depth := range depths {
-		bttt.Perft(pos, depth)
-	}
+	engine := bttt.NewEngine()
+	engine.SetLimits(*bttt.DefaultLimits().SetDepth(5))
+	pos := engine.Position()
 
 	positions := []string{
 		bttt.StartingPosition,
@@ -25,7 +22,12 @@ func main() {
 		if err != nil {
 			fmt.Print(err)
 		} else {
-			fmt.Printf("%s, eval=%d\n", notation, bttt.Evaluate(pos))
+			// Show total number of nodes
+			n := bttt.Perft(engine.Position(), 5)
+			res := engine.Search()
+
+			// Percentage:
+			fmt.Printf("nodes searched %.4f\n", float32(res.Nodes)/float32(n))
 		}
 	}
 }

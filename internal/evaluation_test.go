@@ -8,7 +8,7 @@ func TestEvalInitPosition(t *testing.T) {
 	// Check if the initial position's evaluation is 0
 	pos := NewPosition()
 
-	if eval := Evaluate(pos); eval != Value(0) {
+	if eval := Evaluate(pos); eval != 0 {
 		t.Errorf("Evaluate(init)=%d, want=0", eval)
 	}
 }

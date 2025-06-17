@@ -10,11 +10,23 @@ type BoardType [9][9]PieceType
 type PositionState uint8
 
 // Type defines for search/limits
-type Depth int
-type Value int
+type ScoreType uint8
 
 const (
-	MateValue Value = 1000000
+	ValueScore ScoreType = 0
+	MateScore  ScoreType = 1
+)
+
+// Struct holding information about the score value of the search
+type SearchResult struct {
+	Value     int
+	ScoreType ScoreType
+	Bestmove  PosType
+	Nodes     uint64
+}
+
+const (
+	MateValue = -1000000
 )
 
 // Enum for position
@@ -78,13 +90,16 @@ func (pos PosType) SmallIndex() PosType {
 //		     6 | 7 | 8	1
 func (pos PosType) String() string {
 	builder := strings.Builder{}
-	sx, sy := byte(pos.SmallIndex()%3), byte(3-pos.SmallIndex()/3)
-	bx, by := byte(pos.BigIndex()%3), byte(3-pos.BigIndex()/3)
+	si, bi := pos.SmallIndex(), pos.BigIndex()
 
-	builder.WriteByte('A' + bx)
-	builder.WriteByte('0' + by)
-	builder.WriteByte('a' + sx)
-	builder.WriteByte('0' + sy)
+	if si >= 9 || bi >= 9 {
+		return "(none)"
+	}
+
+	builder.WriteByte('A' + byte(bi%3))
+	builder.WriteByte('0' + byte(3-bi/3))
+	builder.WriteByte('a' + byte(si%3))
+	builder.WriteByte('0' + byte(3-si/3))
 
 	return builder.String()
 }

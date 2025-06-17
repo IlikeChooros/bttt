@@ -12,14 +12,14 @@ var _winningPatterns [8]uint = [...]uint{
 }
 
 // Assing value to each of the
-var _pieceSquareTable [9]Value = [...]Value{
+var _pieceSquareTable [9]int = [...]int{
 	5, 0, 5,
 	0, 15, 0,
 	5, 0, 5,
 }
 
 // value representing winning on the 'big square' of the board
-var _winningBigSquareValue Value = 50
+var _winningBigSquareValue int = 50
 
 // Multiplier, for each 'small' square
 var _bigSquareTableFactors [9]float32 = [...]float32{
@@ -54,9 +54,9 @@ func _toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitb
 // When we need 3 moves to complete the pattern: 0
 // When we need 2 moves to resolve our pattern: 5
 // When we need 1 move to complete the pattern: 15
-func _evaluatePattern(pattern, bitboard, enemy_bitboard uint) Value {
+func _evaluatePattern(pattern, bitboard, enemy_bitboard uint) int {
 	// Evaluate our patterns
-	pattern_eval := Value(0)
+	pattern_eval := 0
 	our_count := bits.OnesCount(pattern & bitboard)
 	intersection := (pattern & bitboard) ^ pattern
 
@@ -64,17 +64,17 @@ func _evaluatePattern(pattern, bitboard, enemy_bitboard uint) Value {
 	if intersection&enemy_bitboard != 0 {
 		pattern_eval -= 5
 	} else {
-		pattern_eval += Value((pow2table[our_count] - 1) * 5)
+		pattern_eval += int((pow2table[our_count] - 1) * 5)
 	}
 
 	return pattern_eval
 }
 
-func _evaluateSquare(square [9]PieceType, ourPiece PieceType) Value {
+func _evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
 	// Look for patterns
-	eval := Value(0)
+	eval := 0
 	bitboard, enemy_bitboard := _toBitboards(square, ourPiece)
-	square_table_eval := Value(0)
+	square_table_eval := 0
 
 	// Calculate the piece square table for each side
 	temp, enemytemp := bitboard, enemy_bitboard
@@ -89,7 +89,7 @@ func _evaluateSquare(square [9]PieceType, ourPiece PieceType) Value {
 	}
 
 	// Evaluate patterns
-	pattern_eval := Value(0)
+	pattern_eval := 0
 	for _, pattern := range _winningPatterns {
 		// Evaluate our patterns
 		pattern_eval += _evaluatePattern(pattern, bitboard, enemy_bitboard)
@@ -103,9 +103,9 @@ func _evaluateSquare(square [9]PieceType, ourPiece PieceType) Value {
 }
 
 // Returns relative value of this position (meaning positive value are good for us, negative for the enemy)
-func Evaluate(pos *Position) Value {
+func Evaluate(pos *Position) int {
 	// Assuming the position is NOT terminated
-	eval := Value(0)
+	eval := 0
 	ourPiece := PieceCircle
 	winningState := PositionCircleWon
 
@@ -116,7 +116,7 @@ func Evaluate(pos *Position) Value {
 
 	// Evaluate whole board
 	for i := range pos.position {
-		value := Value(0)
+		value := 0
 
 		if state := pos.bigPositionState[i]; state == PositionUnResolved {
 			// Evaluate unresolved square
@@ -133,7 +133,7 @@ func Evaluate(pos *Position) Value {
 		}
 
 		// Add product of value and it's factor
-		eval += Value(float32(value) * _bigSquareTableFactors[i])
+		eval += int(float32(value) * _bigSquareTableFactors[i])
 	}
 
 	return eval

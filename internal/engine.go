@@ -6,5 +6,32 @@ search best move, based on given parameteres
 */
 type Engine struct {
 	position *Position
-	limits   Limits
+	limits   *Limits
+	result   SearchResult
+}
+
+// Get new engine instance
+func NewEngine() *Engine {
+	e := new(Engine)
+	e.position = NewPosition()
+	e.limits = DefaultLimits()
+	e.result = SearchResult{}
+	return e
+}
+
+// Starting seraching for the bestmove
+func (e *Engine) Search() SearchResult {
+	// In the future, add some setup, maybe don't use 'main' thread
+	e._IterativeDeepening()
+	return e.result
+}
+
+// Get the position object
+func (e *Engine) Position() *Position {
+	return e.position
+}
+
+// Set the limits
+func (e *Engine) SetLimits(limits Limits) {
+	*e.limits = limits
 }
