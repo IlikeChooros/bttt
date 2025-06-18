@@ -12,9 +12,10 @@ type HashTable[T any] map[utils.Uint128]T
 // Transposition table
 var _transpTable HashTable[HashEntry]
 
-// Hash the small board
-func HashSmallBoard(bitboard uint) {
-
+func HashSmallBoard(o_bitboard, x_bitboard uint) uint {
+	// Since the o's and x's are by themselves hashes of the position
+	// This is as simple as shifting one to the left by 9
+	return (o_bitboard & 0b111111111) | ((x_bitboard << 9) & 0b1111111111000000000)
 }
 
 func setupTranspTable() {
