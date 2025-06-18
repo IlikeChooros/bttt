@@ -6,7 +6,6 @@ import (
 )
 
 func (e *Engine) _IterativeDeepening() {
-
 	// Declare variables
 	e.result.Nodes = 0
 	pos := e.position

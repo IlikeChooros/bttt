@@ -5,6 +5,9 @@ import (
 	"strings"
 )
 
+// Number of sections, seperated by space in the notation
+const _notationNumberOfSections int = 3
+
 // string notation for the big tic tac toe position
 // Much like the FEN representation of a chessboard
 // Will result in something like this:

@@ -11,6 +11,8 @@ type PositionState uint8
 
 // Type defines for search/limits
 type ScoreType uint8
+type HashEntry struct {
+}
 
 const (
 	ValueScore ScoreType = 0
