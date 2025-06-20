@@ -44,7 +44,16 @@ func (pos *Position) SetupBoardState() {
 	}
 }
 
-// Check if given 'small' square is terminated\
+// Check if given slice is filled with items other than 'none'
+func _isFilled[T comparable](arr []T, none T) bool {
+	is_filled := true
+	for i := 0; is_filled && i < len(arr); i++ {
+		is_filled = arr[i] != none
+	}
+	return is_filled
+}
+
+// Check if given 'small' square is terminated
 // TODO: use bitboards for this function
 func _checkSquareTermination(square [9]PieceType) PositionState {
 
@@ -65,13 +74,8 @@ func _checkSquareTermination(square [9]PieceType) PositionState {
 	}
 
 	// Check draw conditions
-	is_filled := true
-	for i := 0; i < 9 && is_filled; i++ {
-		is_filled = square[i] != PieceNone
-	}
-
 	// Fully filled, and no outcome, meaning that's a draw
-	if is_filled {
+	if _isFilled(square[:], PieceNone) {
 		return PositionDraw
 	}
 
@@ -83,16 +87,10 @@ func (pos *Position) CheckTerminationPattern() {
 	// Check if we are in a terminated state of the board
 	// Assuming we correctly updated 'bigPositionState'
 
-	// Check draw condition
-	is_draw := true
-	if pos.bigPositionState[_patterns[0][0]] != pos.bigPositionState[_patterns[0][1]] ||
-		pos.bigPositionState[_patterns[0][1]] != pos.bigPositionState[_patterns[0][2]] ||
-		pos.bigPositionState[_patterns[0][0]] != PositionDraw {
-		is_draw = false
-	}
-
-	// Check draw condition
-	if is_draw {
+	// Check first draw condition:
+	// If our current BigIndex board,
+	// Is fully filled, thus no move is possible
+	if pos.BigIndex() != int(posIndexIllegal) && _isFilled(pos.position[pos.BigIndex()][:], PieceNone) {
 		pos.termination = TerminationDraw
 		return
 	}
@@ -104,7 +102,7 @@ func (pos *Position) CheckTerminationPattern() {
 			pos.bigPositionState[pattern[1]] == pos.bigPositionState[pattern[2]] &&
 			v != PositionUnResolved && v != PositionDraw {
 
-			// Check if that terminates that board, meaning one of the sides won
+			// Got a winner
 			if v == PositionCircleWon {
 				pos.termination = TerminationCircleWon
 			} else {
@@ -114,6 +112,14 @@ func (pos *Position) CheckTerminationPattern() {
 		}
 	}
 
-	// This is neither a draw or a win, so there is no termination
-	pos.termination = TerminationNone
+	// Check other draw condition
+	// If there is no winner, check if all of the squares position
+	// aren't unresolved, if so that means we got a draw
+	is_draw := _isFilled(pos.bigPositionState[:], PositionUnResolved)
+	if is_draw {
+		pos.termination = TerminationDraw
+	} else {
+		// This is neither a draw or a win, so there is no termination
+		pos.termination = TerminationNone
+	}
 }

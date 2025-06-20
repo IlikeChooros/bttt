@@ -5,14 +5,26 @@ import "strings"
 // Type defines for the position
 type PieceType int8
 type TurnType bool
-type PosType uint8
+type PosType uint8 // Also used as move representation
 type BoardType [9][9]PieceType
 type PositionState uint8
+type EntryNodeType uint8
 
 // Type defines for search/limits
 type ScoreType uint8
 type HashEntry struct {
+	depth    int
+	hash     string
+	score    int
+	nodeType EntryNodeType
+	bestmove PosType
 }
+
+const (
+	Exact      EntryNodeType = iota // Exact value of the node (a pvs node)
+	LowerBound                      // It's value if <= alpha
+	UpperBound                      // This node caused a beta-cutoff (beta >= alpha)
+)
 
 const (
 	ValueScore ScoreType = 0

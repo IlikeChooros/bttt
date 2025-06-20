@@ -12,6 +12,7 @@ type Position struct {
 	bigPositionState [9]PositionState // Array of uint8's, where each one means, either cross, circle or no one won on that square
 	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
 	termination      Termination
+	hash             uint64 // Current hash of the position
 }
 
 // Create a heap-allocated, initialized Big Tic Tac Toe position
@@ -72,6 +73,9 @@ func (p *Position) MakeMove(move PosType) {
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
+
+	// Update Big board state
+	p.bigPositionState[bigIndex] = _checkSquareTermination(p.position[bigIndex])
 
 	// Append new state
 	p.stateList.Append(move, !lastState.turn)

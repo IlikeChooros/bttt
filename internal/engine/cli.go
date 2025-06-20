@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 )
 
 type Cli struct {
@@ -48,6 +49,23 @@ func (cli *Cli) Start() {
 
 var _cliErrorFormat string = "[CLI] expected at least %d token(s) for command %s"
 
+func _parseIntToken(tokenIdx int, tokens []string, f func(int)) error {
+	if tokenIdx >= len(tokens) {
+		// Safe, because tokenIdx >= 1 && tokenIdx <= len(tokens)
+		return fmt.Errorf("[CLI] exptected number value for %s", tokens[tokenIdx-1])
+	}
+
+	var n int
+	_, err := fmt.Sscanf(tokens[tokenIdx], "%d", &n)
+	if err != nil {
+		return err
+	}
+
+	// Invoke the function
+	f(n)
+	return nil
+}
+
 // Handle given input arguments as 1 string (should be seprated by space)
 func (cli *Cli) parseArgument(arg string) error {
 	if len(arg) == 0 {
@@ -69,6 +87,33 @@ func (cli *Cli) parseArgument(arg string) error {
 			return fmt.Errorf(_cliErrorFormat, 1, "position")
 		}
 		return cli.handlePosition(tokens[1:])
+	case "test":
+		if len(tokens) < 2 {
+			return fmt.Errorf(_cliErrorFormat, 1, "test")
+		}
+		// Test the move generation
+		if tokens[1] == "movegen" {
+			return _parseIntToken(2, tokens, func(depth int) {
+				now := time.Now()
+				avgtime := float64(0)
+				nodes := uint64(0)
+
+				defer func() {
+					fmt.Printf("\rAvg %.1f Mnps\033[K\n", float64(nodes)/avgtime)
+				}()
+
+				const Ntries = 10
+
+				for i := 0; i < Ntries; i++ {
+					nodes = Perft(cli.engine.position, depth, true, false)
+					avgtime += float64(time.Since(now).Microseconds()-int64(avgtime)) / float64(i+1)
+					fmt.Printf("\rProgress: %.1f (eta: %s)\033[K",
+						(float32(i+1)/Ntries)*100,
+						time.Duration(avgtime*float64(Ntries-(i+1))*1000).String())
+					now = time.Now()
+				}
+			})
+		}
 	}
 
 	return nil
@@ -79,28 +124,15 @@ func (cli *Cli) parseArgument(arg string) error {
 // go perft|[ depth <n> | nodes <n> | movetime <n>]
 func (cli *Cli) handleGo(tokens []string) error {
 
-	parseIntToken := func(tokenIdx int, f func(int)) error {
-		if tokenIdx >= len(tokens) {
-			// Safe, because tokenIdx >= 1 && tokenIdx <= len(tokens)
-			return fmt.Errorf("[CLI] exptected number value for %s", tokens[tokenIdx-1])
-		}
-
-		var n int
-		_, err := fmt.Sscanf(tokens[tokenIdx], "%d", &n)
-		if err != nil {
-			return err
-		}
-
-		// Invoke the function
-		f(n)
-		return nil
-	}
-
 	// Handle 'perft' command separately
 	if tokens[0] == "perft" {
 		// Next token should be depth
-		return parseIntToken(1, func(depth int) {
-			Perft(cli.engine.position, depth)
+		return _parseIntToken(1, tokens, func(depth int) {
+			Perft(cli.engine.position, depth, false, true)
+		})
+	} else if tokens[0] == "valid-perft" {
+		return _parseIntToken(1, tokens, func(depth int) {
+			Perft(cli.engine.position, depth, true, true)
 		})
 	}
 
@@ -116,17 +148,17 @@ func (cli *Cli) handleGo(tokens []string) error {
 		switch tokens[i] {
 		case "depth":
 			// Next token should be an integer value
-			err = parseIntToken(i+1, func(depth int) {
+			err = _parseIntToken(i+1, tokens, func(depth int) {
 				limits.depth = depth
 				i++
 			})
 		case "nodes":
-			err = parseIntToken(i+1, func(nodes int) {
+			err = _parseIntToken(i+1, tokens, func(nodes int) {
 				limits.nodes = uint64(nodes)
 				i++
 			})
 		case "movetime":
-			err = parseIntToken(i+1, func(movetime int) {
+			err = _parseIntToken(i+1, tokens, func(movetime int) {
 				limits.movetime = movetime
 				i++
 			})

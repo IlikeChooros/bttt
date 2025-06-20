@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+var _transpTable = _NewHashTable[HashEntry]()
+
 func (e *Engine) _IterativeDeepening() {
 	// Declare variables
 	e.result.Nodes = 0
@@ -26,7 +28,7 @@ func (e *Engine) _IterativeDeepening() {
 
 		for _, m := range moves.moves {
 			pos.MakeMove(m)
-			score = e.negaAlphaBeta(d, 0, alpha, beta)
+			score = e._NegaAlphaBeta(d, 0, alpha, beta)
 			pos.UndoMove()
 
 			alpha = max(alpha, score)
@@ -40,7 +42,9 @@ func (e *Engine) _IterativeDeepening() {
 			}
 		}
 
-		fmt.Printf("info depth %d score %d nodes %d time %s\n", d, score, e.result.Nodes, time.Since(beginTime).String())
+		deltatime := time.Since(beginTime)
+		fmt.Printf("info depth %d score %d nps %d nodes %d \n",
+			d+1, score, (e.result.Nodes*1000)/uint64(deltatime.Milliseconds()+1), e.result.Nodes)
 	}
 
 	// Print the result
@@ -51,13 +55,33 @@ func (e *Engine) _IterativeDeepening() {
 	e.result.Value = bestscore
 }
 
-func (e *Engine) negaAlphaBeta(depth, ply, alpha, beta int) int {
+func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 
 	e.result.Nodes++
+
+	// Check if we calculated value of this node already, with requirement
+	// of bigger or equal to depth of our current node's depth
+	// strpos := e.position.Notation()
+	oldAlpha := alpha
+	if val, ok := _transpTable.Get(0); ok && val.depth >= depth {
+		// Use the cached value
+		if val.nodeType == Exact {
+			return val.score
+		} else if val.nodeType == LowerBound {
+			alpha = max(alpha, val.score)
+		} else {
+			beta = min(beta, val.score)
+		}
+
+		if alpha >= beta {
+			return val.score
+		}
+	}
+
 	pos := e.position
 	bestvalue := MateValue + depth
 	value := 0
-	// bestmove := posIllegal
+	bestmove := posIllegal
 
 	// Check if that's terminated node, if so return according value
 	if pos.IsTerminated() {
@@ -77,11 +101,11 @@ func (e *Engine) negaAlphaBeta(depth, ply, alpha, beta int) int {
 	moves := pos.GenerateMoves()
 	for _, m := range moves.Slice() {
 		pos.MakeMove(m)
-		value = -e.negaAlphaBeta(depth-1, ply+1, -beta, -alpha)
+		value = -e._NegaAlphaBeta(depth-1, ply+1, -beta, -alpha)
 		pos.UndoMove()
 
 		if value > bestvalue {
-			// bestmove = m
+			bestmove = m
 			bestvalue = value
 			alpha = max(alpha, value)
 		}
@@ -89,6 +113,23 @@ func (e *Engine) negaAlphaBeta(depth, ply, alpha, beta int) int {
 		if alpha >= beta {
 			break
 		}
+	}
+
+	// Set the hash entry value
+	newEntry := HashEntry{}
+	newEntry.bestmove = bestmove
+	newEntry.depth = depth
+	// newEntry.hash = strpos
+
+	if bestvalue >= beta {
+		// Beta cutoff
+		newEntry.nodeType = UpperBound
+	}
+	if bestvalue <= oldAlpha {
+		// Lowerbound value
+		newEntry.nodeType = LowerBound
+	} else {
+		newEntry.nodeType = Exact
 	}
 
 	return bestvalue

@@ -33,7 +33,7 @@ var pow2table [6]int = [...]int{
 }
 
 // Convert given 'small square' with given 'ourPiece' parameter, into (our bitboard, enemy bitboard)
-func _toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitboard uint) {
+func toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitboard uint) {
 	// Write whole board into a bitboard
 	for i, v := range square {
 		// Evaluate square table evaluation
@@ -54,7 +54,7 @@ func _toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitb
 // When we need 3 moves to complete the pattern: 0
 // When we need 2 moves to resolve our pattern: 5
 // When we need 1 move to complete the pattern: 15
-func _evaluatePattern(pattern, bitboard, enemy_bitboard uint) int {
+func evaluatePattern(pattern, bitboard, enemy_bitboard uint) int {
 	// Evaluate our patterns
 	pattern_eval := 0
 	our_count := bits.OnesCount(pattern & bitboard)
@@ -70,10 +70,10 @@ func _evaluatePattern(pattern, bitboard, enemy_bitboard uint) int {
 	return pattern_eval
 }
 
-func _evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
+func evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
 	// Look for patterns
 	eval := 0
-	bitboard, enemy_bitboard := _toBitboards(square, ourPiece)
+	bitboard, enemy_bitboard := toBitboards(square, ourPiece)
 	square_table_eval := 0
 
 	// Calculate the piece square table for each side
@@ -92,8 +92,8 @@ func _evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
 	pattern_eval := 0
 	for _, pattern := range _winningPatterns {
 		// Evaluate our patterns
-		pattern_eval += _evaluatePattern(pattern, bitboard, enemy_bitboard)
-		pattern_eval -= _evaluatePattern(pattern, enemy_bitboard, bitboard)
+		pattern_eval += evaluatePattern(pattern, bitboard, enemy_bitboard)
+		pattern_eval -= evaluatePattern(pattern, enemy_bitboard, bitboard)
 	}
 
 	// Add up the evaluation
@@ -120,7 +120,7 @@ func Evaluate(pos *Position) int {
 
 		if state := pos.bigPositionState[i]; state == PositionUnResolved {
 			// Evaluate unresolved square
-			value += _evaluateSquare(pos.position[i], ourPiece)
+			value += evaluateSquare(pos.position[i], ourPiece)
 		} else {
 			// Assign value by the square state
 			if state != PositionDraw {

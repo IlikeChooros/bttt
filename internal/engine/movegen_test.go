@@ -92,7 +92,7 @@ func TestPerft(t *testing.T) {
 
 	pos := NewPosition()
 	for i, n := range valid_nodes {
-		nodes := Perft(pos, i+1)
+		nodes := Perft(pos, i+1, false, true)
 
 		// Check if the values match
 		if nodes != n {

@@ -13,9 +13,26 @@ Big Tic Tac Toe in Go:
   - [ ] Evaluation: 
     - [ ] Make the board hold also bitboards for each square (so we don't have to calculate them every time)
   - [ ] Search:
-    - [ ] Use transposition tables
+    - [ ] Use transposition tables:
+      - [ ] Instead of creating a perftect hash (using 9 * 18 bits to store the whole position), find such 'magic' number that will 
     - [ ] Add move ordering
     - [ ] Use killer moves
     - [ ] Use history heuristic
 - [ ] OTHER:
   - [x] Refactor the file structure, use folders, and if possible use different folder for tests
+  
+## IDEAS
+
+### Hashing:
+```
+In the big tic tac toe, we can get an 'illegal' position on the small square, meaning number of 
+all positions is 3^9 = 19683. But on the 'big board' we can have only 5478 positions.
+
+```
+Sources:
+- [Number of valid positions in TTT](https://math.stackexchange.com/questions/469371/determining-the-number-of-valid-tictactoe-board-states-in-terms-of-board-dimensi)
+
+### Move generation:
+```
+Use bitboards to generate moves
+```

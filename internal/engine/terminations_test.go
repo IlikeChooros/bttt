@@ -22,7 +22,7 @@ func TestTerminatedPositions(t *testing.T) {
 	// Test if given terminated position are correctly detected
 	notations := []string{
 		StartingPosition, // no termination
-		// x o x Draw position
+		// x o x Draw position (whole board is filled)
 		// x o x
 		// o x o
 		"xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo o 0",
@@ -30,6 +30,8 @@ func TestTerminatedPositions(t *testing.T) {
 		"xxx6/xxx6/xxx6/9/9/9/9/9/9 x 0",
 		// o o o Impossible position: Winning position for O
 		"ooo6/9/ooo6/9/ooo6/xoxo5/ooo6/9/ooo6 x 0",
+		// Draw, by no avaible move
+		"xoxxoxoxo/9/9/9/9/9/9/9/9 x 0",
 	}
 
 	terminations := []Termination{
@@ -37,6 +39,7 @@ func TestTerminatedPositions(t *testing.T) {
 		TerminationDraw,
 		TerminationCrossWon,
 		TerminationCircleWon,
+		TerminationDraw,
 	}
 
 	pos := NewPosition()
@@ -50,6 +53,53 @@ func TestTerminatedPositions(t *testing.T) {
 				// Test the position
 				if term := terminations[i]; pos.Termination() != term {
 					ts.Errorf("pos.Termination()=%d, want=%d", pos.Termination(), term)
+				}
+			}
+		})
+	}
+}
+
+func TestTerminationsByMove(t *testing.T) {
+	// Test if the board position state is evaluated correctly after each move
+
+	positions := []string{
+		"xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxx1xoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo o 4",
+		"xxx6/xxx6/x1x6/9/9/9/9/9/9 x 2",
+		"ooo6/9/ooo6/9/ooo6/xoxo5/oo7/9/9 o 6",
+		"1oxxoxoxo/9/9/9/9/9/9/9/9 x 0",
+	}
+
+	moves := [][]PosType{
+		{MakeMove(4, 4)},
+		{MakeMove(2, 1)},
+		{MakeMove(6, 2)},
+		{MakeMove(0, 0)},
+	}
+
+	states := []Termination{
+		TerminationDraw,
+		TerminationCrossWon,
+		TerminationCircleWon,
+		TerminationDraw,
+	}
+
+	pos := NewPosition()
+	for i, position := range positions {
+
+		// Run these as subtests
+		t.Run(fmt.Sprintf("Subtest:%s", position), func(t *testing.T) {
+			err := pos.FromNotation(position)
+			if err != nil {
+				t.Error(err)
+			} else {
+				// Make the moves
+				for _, m := range moves[i] {
+					pos.MakeMove(m)
+				}
+
+				// Check if the terminations match
+				if !pos.IsTerminated() || states[i] != pos.termination {
+					t.Errorf("Termination state doesn't match, got=%v, want=%v", pos.termination, states[i])
 				}
 			}
 		})

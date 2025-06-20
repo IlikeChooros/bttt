@@ -1,7 +1,7 @@
 package main
 
 import (
-	bttt "bttt/internal"
+	uttt "uttt/internal/engine"
 	// "fmt"
 )
 
@@ -31,7 +31,7 @@ func main() {
 	// 	}
 	// }
 
-	cli := bttt.NewCli()
+	cli := uttt.NewCli()
 	cli.Start()
 
 }

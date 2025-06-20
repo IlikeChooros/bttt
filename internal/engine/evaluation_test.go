@@ -56,7 +56,7 @@ func TestSquareEvaluation(t *testing.T) {
 	}
 
 	for i, square := range squares {
-		eval := _evaluateSquare(square, pieces[i])
+		eval := evaluateSquare(square, pieces[i])
 
 		// Setup actual relative state of the square
 		state := Draw
@@ -68,10 +68,10 @@ func TestSquareEvaluation(t *testing.T) {
 
 		// States should match
 		if state != states[i] {
-			t.Errorf("_evaluateSquare(%v)=%d, got state=%d, want=%d",
+			t.Errorf("evaluateSquare(%v)=%d, got state=%d, want=%d",
 				square, eval, state, states[i])
 		} else {
-			t.Logf("_evaluateSquare(%d)=%d", i, eval)
+			t.Logf("evaluateSquare(%d)=%d", i, eval)
 		}
 	}
 }
