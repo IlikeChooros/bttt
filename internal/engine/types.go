@@ -1,6 +1,7 @@
 package bttt
 
 import (
+	"fmt"
 	"strings"
 )
 
@@ -14,20 +15,8 @@ type EntryNodeType uint8
 
 // Type defines for search/limits
 type ScoreType uint8
-type HashEntry struct {
-	depth    int
-	hash     string
-	score    int
-	nodeType EntryNodeType
-	bestmove PosType
-}
 
-const (
-	Exact      EntryNodeType = iota // Exact value of the node (a pvs node)
-	LowerBound                      // It's value if <= alpha
-	UpperBound                      // This node caused a beta-cutoff (beta >= alpha)
-)
-
+// Mate values for Score type
 const (
 	ValueScore ScoreType = 0
 	MateScore  ScoreType = 1
@@ -41,9 +30,33 @@ type SearchResult struct {
 	Nodes     uint64
 }
 
-const (
-	MateValue = -1000000
-)
+// Set the score value, will set the according type of the score
+func (s *SearchResult) SetValue(value int, turn TurnType) {
+	absValue := s.Value
+	if s.Value < 0 {
+		absValue = -absValue
+	}
+
+	// That's a mate score
+	if absValue >= MateTresholdValue {
+		// mate in <n> ply
+		s.Value = absValue - MateTresholdValue
+		if turn == CircleTurn {
+			s.Value = -s.Value
+		}
+		s.ScoreType = MateScore
+	} else {
+		s.ScoreType = ValueScore
+	}
+}
+
+// Get the string representation of the value
+func (s SearchResult) String() string {
+	if s.ScoreType == MateScore {
+		return fmt.Sprintf("%dM", s.Value)
+	}
+	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
+}
 
 // Enum for position
 const (
@@ -67,8 +80,8 @@ const (
 
 // Enum for the turns
 const (
-	CircleTurn TurnType = true
-	CrossTurn  TurnType = false
+	CircleTurn TurnType = false
+	CrossTurn  TurnType = true
 )
 
 // Create piece from a rune
@@ -95,7 +108,7 @@ func (pos PosType) SmallIndex() PosType {
 
 // Enum for the squares (same for the smaller ones)
 const (
-	A3 PosType = iota
+	A3 int = iota
 	B3
 	C3
 	A2
@@ -133,6 +146,7 @@ func (pos PosType) String() string {
 	return builder.String()
 }
 
+// Convert given move notation (should be done with PosType.String()) to PosType
 func MoveFromString(str string) PosType {
 	if str == "(none)" || len(str) != 4 {
 		return posIllegal

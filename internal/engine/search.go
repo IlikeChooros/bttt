@@ -5,9 +5,17 @@ import (
 	"time"
 )
 
-var _transpTable = _NewHashTable[HashEntry]()
+// Mate value for the search
+const (
+	MateValue         = -1000000
+	MaxDepth          = 64
+	MateTresholdValue = -MateValue - MaxDepth
+)
+
+// var _transpTable = _NewHashTable[HashEntry](1 << 20)
 
 func (e *Engine) _IterativeDeepening() {
+
 	// Declare variables
 	e.result.Nodes = 0
 	pos := e.position
@@ -16,7 +24,6 @@ func (e *Engine) _IterativeDeepening() {
 	score := 0
 	bestscore := MateValue
 	bestmove := posIllegal
-	e.timer.Reset()
 	e.stop.Store(false)
 
 	// Don't start the search in a terminated position
@@ -25,14 +32,13 @@ func (e *Engine) _IterativeDeepening() {
 		return
 	}
 
-	fmt.Println(pos.GenerateMoves().Slice())
-
+	e.timer.Reset()
 	for d := 0; !e.stop.Load() && (e.limits.infinite || d < e.limits.depth); d++ {
 		moves := pos.GenerateMoves()
 
 		for _, m := range moves.Slice() {
 			pos.MakeMove(m)
-			score = e._NegaAlphaBeta(d, 0, alpha, beta)
+			score = -e._NegaAlphaBeta(d, 0, -beta, -alpha)
 			pos.UndoMove()
 
 			// Now check if the timer has ended, if so this move wasn't fully searched,
@@ -47,8 +53,15 @@ func (e *Engine) _IterativeDeepening() {
 			}
 
 			if score > bestscore {
+				e.result.SetValue(score, e.position.Turn())
 				bestmove = m
 				alpha = max(alpha, score)
+
+				// That's a mate, go back
+				if e.result.ScoreType == MateScore {
+					e.Stop()
+					break
+				}
 			}
 
 			if alpha >= beta {
@@ -77,27 +90,28 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 
 	// Check if we calculated value of this node already, with requirement
 	// of bigger or equal to depth of our current node's depth
-	// strpos := e.position.Notation()
-	oldAlpha := alpha
-	if val, ok := _transpTable.Get(0); ok && val.depth >= depth {
-		// Use the cached value
-		if val.nodeType == Exact {
-			return val.score
-		} else if val.nodeType == LowerBound {
-			alpha = max(alpha, val.score)
-		} else {
-			beta = min(beta, val.score)
-		}
 
-		if alpha >= beta {
-			return val.score
-		}
-	}
+	// oldAlpha := alpha
+	// hash := e.position.Hash()
+	// if val, ok := _transpTable.Get(hash); ok && val.depth >= depth {
+	// 	// Use the cached value
+	// 	if val.nodeType == Exact {
+	// 		return val.score
+	// 	} else if val.nodeType == LowerBound {
+	// 		alpha = max(alpha, val.score)
+	// 	} else {
+	// 		beta = min(beta, val.score)
+	// 	}
+
+	// 	if alpha >= beta {
+	// 		return val.score
+	// 	}
+	// }
 
 	pos := e.position
 	bestvalue := MateValue + depth
 	value := 0
-	bestmove := posIllegal
+	// bestmove := posIllegal
 
 	// Check if that's terminated node, if so return according value
 	if pos.IsTerminated() {
@@ -122,7 +136,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 		pos.UndoMove()
 
 		if value > bestvalue {
-			bestmove = m
+			// bestmove = m
 			bestvalue = value
 			alpha = max(alpha, value)
 		}
@@ -138,21 +152,24 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	}
 
 	// Set the hash entry value
-	newEntry := HashEntry{}
-	newEntry.bestmove = bestmove
-	newEntry.depth = depth
-	// newEntry.hash = strpos
+	// newEntry := HashEntry{}
+	// newEntry.bestmove = bestmove
+	// newEntry.depth = depth
+	// newEntry.hash = hash
+	// newEntry.score = bestvalue
 
-	if bestvalue >= beta {
-		// Beta cutoff
-		newEntry.nodeType = UpperBound
-	}
-	if bestvalue <= oldAlpha {
-		// Lowerbound value
-		newEntry.nodeType = LowerBound
-	} else {
-		newEntry.nodeType = Exact
-	}
+	// if bestvalue >= beta {
+	// 	// Beta cutoff
+	// 	newEntry.nodeType = UpperBound
+	// }
+	// if bestvalue <= oldAlpha {
+	// 	// Lowerbound value
+	// 	newEntry.nodeType = LowerBound
+	// } else {
+	// 	newEntry.nodeType = Exact
+	// }
+
+	// _transpTable.Set(hash, newEntry)
 
 	return bestvalue
 }

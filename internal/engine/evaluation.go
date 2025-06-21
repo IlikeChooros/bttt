@@ -109,7 +109,7 @@ func Evaluate(pos *Position) int {
 	ourPiece := PieceCircle
 	winningState := PositionCircleWon
 
-	if !pos.Turn() {
+	if pos.Turn() == CrossTurn {
 		ourPiece = PieceCross
 		winningState = PositionCrossWon
 	}

@@ -45,3 +45,9 @@ and then counting the number of bits in the result.
 Program that will run asynchronously many games, and will report the results.
 Also allowing user to lookup one of the games and see the moves.
 ```
+
+### UI
+
+```
+Add simple cmd line interface, that will allow user to play against the engine.
+```

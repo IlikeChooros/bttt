@@ -3,7 +3,7 @@ package bttt
 // Constants
 
 const (
-	StartingPosition string = "9/9/9/9/9/9/9/9/9 o -"
+	StartingPosition string = "9/9/9/9/9/9/9/9/9 x -"
 )
 
 // Main position struct
@@ -29,12 +29,19 @@ func (b *Position) Init() {
 
 func (p *Position) Reset() {
 	p.stateList.Clear()
+	p.termination = TerminationNone
+	p.hash = 0
 
 	// Zero the board
 	for i := range p.position {
 		for j := range p.position[i] {
 			p.position[i][j] = PieceNone
 		}
+	}
+
+	// Zero the bigPositionState
+	for i := range p.bigPositionState {
+		p.bigPositionState[i] = PositionUnResolved
 	}
 }
 
@@ -67,7 +74,7 @@ func (p *Position) MakeMove(move PosType) {
 	lastState := p.stateList.Last()
 
 	// Meaning last turn, cross made a move, so now it's circle's turn
-	if !lastState.turn {
+	if lastState.turn != CircleTurn {
 		piece = PieceCircle
 	}
 

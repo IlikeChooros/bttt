@@ -20,7 +20,7 @@ func NewStateList() *StateList {
 // Initialize the state list, for example after calling 'Clear'
 func (sl *StateList) Init() {
 	sl.list = make([]BoardState, 0, 10)
-	sl.Append(posIllegal, CrossTurn)
+	sl.Append(posIllegal, CircleTurn)
 }
 
 // Append new state

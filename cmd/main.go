@@ -2,7 +2,6 @@ package main
 
 import (
 	uttt "uttt/internal/engine"
-	// "fmt"
 )
 
 func main() {
@@ -33,5 +32,4 @@ func main() {
 
 	cli := uttt.NewCli()
 	cli.Start()
-
 }

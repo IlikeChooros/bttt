@@ -79,7 +79,7 @@ func (p *Position) Notation() string {
 
 	// Add the turn
 	builder.WriteByte(' ')
-	if p.Turn() {
+	if p.Turn() == CircleTurn {
 		builder.WriteByte('o')
 	} else {
 		builder.WriteByte('x')
@@ -182,7 +182,7 @@ func _FromNotation(pos *Position, notation string) error {
 
 	// Read the side
 	if v := notation[seprarationIndexes[0]+1]; v == 'o' || v == 'x' {
-		pos.stateList.Last().turn = v != 'o'
+		pos.stateList.Last().turn = v != 'x'
 	} else {
 		return fmt.Errorf("Invalid side character %c", v)
 	}

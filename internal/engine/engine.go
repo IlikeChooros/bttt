@@ -14,6 +14,11 @@ type Engine struct {
 	stop     atomic.Bool
 }
 
+// Initialize the package
+func Init() {
+	_InitHashing()
+}
+
 // Get new engine instance
 func NewEngine() *Engine {
 	e := new(Engine)

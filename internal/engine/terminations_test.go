@@ -89,9 +89,15 @@ func TestTerminationsByMove(t *testing.T) {
 		// Run these as subtests
 		t.Run(fmt.Sprintf("Subtest:%s", position), func(t *testing.T) {
 			err := pos.FromNotation(position)
+
 			if err != nil {
 				t.Error(err)
 			} else {
+				// Positions shouldn't be terminated
+				if pos.IsTerminated() {
+					t.Error("Position is terminated: ", pos.Notation())
+				}
+
 				// Make the moves
 				for _, m := range moves[i] {
 					pos.MakeMove(m)

@@ -27,6 +27,9 @@ func (cli *Cli) Start() {
 		"e", "q", "exit", "quit",
 	}
 
+	// Initialize the lib
+	Init()
+
 	var arg string
 	scanner := bufio.NewScanner(os.Stdin)
 	fmt.Println("Ultimate Tic Tac Toe engine")
@@ -99,14 +102,18 @@ func (cli *Cli) parseArgument(arg string) error {
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "makemove")
 		}
-		mv := MoveFromString(tokens[1])
-		if mv == posIllegal {
-			return fmt.Errorf("[CLI] invalid move notation, expected [A-C][1-3][a-c][1-3]")
+		for _, token := range tokens[1:] {
+			mv := MoveFromString(token)
+			if mv == posIllegal {
+				return fmt.Errorf("[CLI] invalid move notation, expected [A-C][1-3][a-c][1-3]")
+			}
+			if !cli.engine.position.IsLegal(mv) {
+				return fmt.Errorf("[CLI] Illegal move: %s", token)
+			}
+			cli.engine.position.MakeMove(mv)
 		}
-		if !cli.engine.position.IsLegal(mv) {
-			return fmt.Errorf("[CLI] Illegal move: %s", tokens[1])
-		}
-		cli.engine.position.MakeMove(mv)
+	case "undomove":
+		cli.engine.position.UndoMove()
 	case "test":
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "test")
