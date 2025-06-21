@@ -1,5 +1,7 @@
 package bttt
 
+import "sync/atomic"
+
 /*
 Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
@@ -7,7 +9,9 @@ search best move, based on given parameteres
 type Engine struct {
 	position *Position
 	limits   *Limits
+	timer    *_Timer
 	result   SearchResult
+	stop     atomic.Bool
 }
 
 // Get new engine instance
@@ -16,6 +20,7 @@ func NewEngine() *Engine {
 	e.position = NewPosition()
 	e.limits = DefaultLimits()
 	e.result = SearchResult{}
+	e.timer = _NewTimer()
 	return e
 }
 
@@ -34,4 +39,9 @@ func (e *Engine) Position() *Position {
 // Set the limits
 func (e *Engine) SetLimits(limits Limits) {
 	*e.limits = limits
+	e.timer.Movetime(e.limits.movetime)
+}
+
+func (e *Engine) Stop() {
+	e.stop.Store(true)
 }

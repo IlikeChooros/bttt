@@ -1,6 +1,8 @@
 package bttt
 
-import "strings"
+import (
+	"strings"
+)
 
 // Type defines for the position
 type PieceType int8
@@ -91,6 +93,19 @@ func (pos PosType) SmallIndex() PosType {
 	return pos & _moveSmallIndexMask
 }
 
+// Enum for the squares (same for the smaller ones)
+const (
+	A3 PosType = iota
+	B3
+	C3
+	A2
+	B2
+	C2
+	A1
+	B1
+	C1
+)
+
 // Get string representation of the move, will contain
 // a/b/c 1/2/3 as coorinates, for example big index = 7,
 // small index = 2 -> <big index part><small index part>
@@ -111,9 +126,29 @@ func (pos PosType) String() string {
 	}
 
 	builder.WriteByte('A' + byte(bi%3))
-	builder.WriteByte('0' + byte(3-bi/3))
+	builder.WriteByte('3' - byte(bi/3))
 	builder.WriteByte('a' + byte(si%3))
-	builder.WriteByte('0' + byte(3-si/3))
+	builder.WriteByte('3' - byte(si/3))
 
 	return builder.String()
+}
+
+func MoveFromString(str string) PosType {
+	if str == "(none)" || len(str) != 4 {
+		return posIllegal
+	}
+
+	// Helper function to make sure the coordinates are withing the range
+	_cmp := func(i int, letter byte) bool {
+		return (str[i] >= letter && str[i] <= letter+2) &&
+			(str[i+1] >= '1' && str[i+1] <= '3')
+	}
+
+	if _cmp(0, 'A') && _cmp(2, 'a') {
+		return MakeMove(
+			int((str[0]-'A')+('3'-str[1])*3),
+			int((str[2]-'a')+('3'-str[3])*3))
+	}
+
+	return posIllegal
 }

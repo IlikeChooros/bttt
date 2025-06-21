@@ -14,7 +14,7 @@ func (pos *Position) GenerateMoves() *MoveList {
 	movelist := NewMoveList()
 
 	// If there is no history, we can choose also the 'Big Index' position
-	if pos.stateList.ValidSize() == 0 {
+	if pos.BigIndex() == int(posIndexIllegal) {
 		for i := 0; i < 9; i++ {
 			pos._GenerateMoves(movelist, i)
 		}

@@ -16,25 +16,39 @@ func (e *Engine) _IterativeDeepening() {
 	score := 0
 	bestscore := MateValue
 	bestmove := posIllegal
-	beginTime := time.Now()
+	e.timer.Reset()
+	e.stop.Store(false)
 
+	// Don't start the search in a terminated position
 	if pos.IsTerminated() {
-		fmt.Println("bestmove (none)")
+		fmt.Println("terminated\nbestmove (none)")
 		return
 	}
 
-	for d := 0; d < e.limits.depth; d++ {
+	fmt.Println(pos.GenerateMoves().Slice())
+
+	for d := 0; !e.stop.Load() && (e.limits.infinite || d < e.limits.depth); d++ {
 		moves := pos.GenerateMoves()
 
-		for _, m := range moves.moves {
+		for _, m := range moves.Slice() {
 			pos.MakeMove(m)
 			score = e._NegaAlphaBeta(d, 0, alpha, beta)
 			pos.UndoMove()
 
-			alpha = max(alpha, score)
+			// Now check if the timer has ended, if so this move wasn't fully searched,
+			// so discard it's value
+			if !e.limits.infinite && e.timer.IsEnd() {
+				e.Stop()
+			}
+
+			// Check if we should stop searching the moves
+			if e.stop.Load() {
+				break
+			}
 
 			if score > bestscore {
 				bestmove = m
+				alpha = max(alpha, score)
 			}
 
 			if alpha >= beta {
@@ -42,9 +56,11 @@ func (e *Engine) _IterativeDeepening() {
 			}
 		}
 
-		deltatime := time.Since(beginTime)
-		fmt.Printf("info depth %d score %d nps %d nodes %d \n",
-			d+1, score, (e.result.Nodes*1000)/uint64(deltatime.Milliseconds()+1), e.result.Nodes)
+		deltatime := time.Since(e.timer.Start())
+		fmt.Printf("info depth %d score %d nps %d nodes %d time %dms\n",
+			d+1, score, // depth, score
+			(e.result.Nodes*1000)/uint64(deltatime.Milliseconds()+1), // nps
+			e.result.Nodes, deltatime.Milliseconds()) // time
 	}
 
 	// Print the result
@@ -100,6 +116,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	// Go through the moves
 	moves := pos.GenerateMoves()
 	for _, m := range moves.Slice() {
+
 		pos.MakeMove(m)
 		value = -e._NegaAlphaBeta(depth-1, ply+1, -beta, -alpha)
 		pos.UndoMove()
@@ -108,6 +125,11 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 			bestmove = m
 			bestvalue = value
 			alpha = max(alpha, value)
+		}
+
+		// Check the timer
+		if !e.limits.infinite && e.timer.IsEnd() {
+			return bestvalue
 		}
 
 		if alpha >= beta {

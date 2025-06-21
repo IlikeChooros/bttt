@@ -34,5 +34,14 @@ Sources:
 
 ### Move generation:
 ```
-Use bitboards to generate moves
+Use bitboards to generate moves, this is as simple as xoring the occupancy bitboard with 511,
+and then counting the number of bits in the result.
+```
+
+
+### Tester
+
+```
+Program that will run asynchronously many games, and will report the results.
+Also allowing user to lookup one of the games and see the moves.
 ```

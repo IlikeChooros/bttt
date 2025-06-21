@@ -29,6 +29,7 @@ func (cli *Cli) Start() {
 
 	var arg string
 	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println("Ultimate Tic Tac Toe engine")
 	for {
 		scanner.Scan()
 		arg = scanner.Text()
@@ -40,10 +41,12 @@ func (cli *Cli) Start() {
 			}
 		}
 
-		// Parse the command
-		if err := cli.parseArgument(arg); err != nil {
-			fmt.Println(err)
-		}
+		// Parse the command asynchronously
+		go func() {
+			if err := cli.parseArgument(arg); err != nil {
+				fmt.Println(err)
+			}
+		}()
 	}
 }
 
@@ -76,6 +79,8 @@ func (cli *Cli) parseArgument(arg string) error {
 	tokens := strings.Split(arg, " ")
 
 	switch tokens[0] {
+	case "stop":
+		cli.engine.Stop()
 	case "go":
 		// there should be at least 2 tokens
 		if len(tokens) < 2 {
@@ -87,6 +92,21 @@ func (cli *Cli) parseArgument(arg string) error {
 			return fmt.Errorf(_cliErrorFormat, 1, "position")
 		}
 		return cli.handlePosition(tokens[1:])
+
+	case "getpos":
+		fmt.Println(cli.engine.position.Notation())
+	case "makemove":
+		if len(tokens) < 2 {
+			return fmt.Errorf(_cliErrorFormat, 1, "makemove")
+		}
+		mv := MoveFromString(tokens[1])
+		if mv == posIllegal {
+			return fmt.Errorf("[CLI] invalid move notation, expected [A-C][1-3][a-c][1-3]")
+		}
+		if !cli.engine.position.IsLegal(mv) {
+			return fmt.Errorf("[CLI] Illegal move: %s", tokens[1])
+		}
+		cli.engine.position.MakeMove(mv)
 	case "test":
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "test")
@@ -137,7 +157,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 	}
 
 	// Parse the search commands
-	limits := Limits{}
+	limits := DefaultLimits()
 	var err error
 	for i := 0; i < len(tokens); i++ {
 
@@ -149,19 +169,21 @@ func (cli *Cli) handleGo(tokens []string) error {
 		case "depth":
 			// Next token should be an integer value
 			err = _parseIntToken(i+1, tokens, func(depth int) {
-				limits.depth = depth
+				limits.SetDepth(depth)
 				i++
 			})
 		case "nodes":
 			err = _parseIntToken(i+1, tokens, func(nodes int) {
-				limits.nodes = uint64(nodes)
+				limits.SetNodes(uint64(nodes))
 				i++
 			})
 		case "movetime":
 			err = _parseIntToken(i+1, tokens, func(movetime int) {
-				limits.movetime = movetime
+				limits.SetMovetime(movetime)
 				i++
 			})
+		case "infinite":
+			limits.SetInfinite(true)
 		default:
 			// Unsupported command
 			return fmt.Errorf("[CLI] Unsupported command %s", tokens[i])
@@ -170,7 +192,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 
 	// Run the engine
 	if err == nil {
-		cli.engine.SetLimits(limits)
+		cli.engine.SetLimits(*limits)
 		cli.engine.Search()
 	}
 

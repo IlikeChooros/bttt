@@ -98,3 +98,19 @@ func (p *Position) UndoMove() {
 	// Restore current state
 	p.stateList.Remove()
 }
+
+// Check if given move is legal
+func (p *Position) IsLegal(move PosType) bool {
+
+	bi, si := move.BigIndex(), move.SmallIndex()
+	if p.BigIndex() != int(posIndexIllegal) && bi != PosType(p.BigIndex()) {
+		return false
+	}
+
+	// Index out of range or this square is occupied
+	if bi >= 9 || si >= 9 || p.position[bi][si] != PieceNone {
+		return false
+	}
+
+	return true
+}

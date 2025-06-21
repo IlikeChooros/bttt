@@ -100,3 +100,45 @@ func TestInitPositionNotations(t *testing.T) {
 		}
 	}
 }
+
+// Test move notation
+func TestMoveIllegalNotation(t *testing.T) {
+	mv := posIllegal
+
+	if mv.String() != "(none)" {
+		t.Errorf("mv.String()=%s, want=%s", mv.String(), "(none)")
+	}
+
+	if mv = MoveFromString("(none)"); mv != posIllegal {
+		t.Errorf("Expected mv == posIllegal, got=%v", mv)
+	}
+}
+
+func TestMoveNotations(t *testing.T) {
+	notations := []string{
+		"A1a1", "C2b3", "A3a3", "B1a3",
+		"flsfj", "AaBc", "B1f1", "c1B2",
+		"null", "", "1234", "aaaa",
+	}
+
+	moves := []PosType{
+		MakeMove(6, 6), MakeMove(5, 1), MakeMove(0, 0), MakeMove(7, 0),
+		posIllegal, posIllegal, posIllegal, posIllegal,
+		posIllegal, posIllegal, posIllegal, posIllegal,
+	}
+
+	for i, notation := range notations {
+		// Check if the moves match
+		if v := MoveFromString(notation); v != moves[i] {
+			t.Errorf("Numeric mismatch: %d != %d, (%s != %s)", v, moves[i], notation, moves[i].String())
+		}
+	}
+
+	// Now check the other way (only for the valid ones)
+	for i, move := range moves[:4] {
+		if notations[i] != move.String() {
+			t.Errorf("String mismatch: %s != %s (%d != %d)",
+				move.String(), notations[i], move, MoveFromString(notations[i]))
+		}
+	}
+}
