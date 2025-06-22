@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -61,8 +62,7 @@ func _parseIntToken(tokenIdx int, tokens []string, f func(int)) error {
 		return fmt.Errorf("[CLI] exptected number value for %s", tokens[tokenIdx-1])
 	}
 
-	var n int
-	_, err := fmt.Sscanf(tokens[tokenIdx], "%d", &n)
+	n, err := strconv.Atoi(tokens[tokenIdx])
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (cli *Cli) parseArgument(arg string) error {
 		}
 		for _, token := range tokens[1:] {
 			mv := MoveFromString(token)
-			if mv == posIllegal {
+			if mv == PosIllegal {
 				return fmt.Errorf("[CLI] invalid move notation, expected [A-C][1-3][a-c][1-3]")
 			}
 			if !cli.engine.position.IsLegal(mv) {

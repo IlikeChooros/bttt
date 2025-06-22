@@ -9,6 +9,8 @@ Big Tic Tac Toe in Go:
   - [x] can return a range of moves
 - [x] Make a move generator
 - [x] Add to small square position termination flags (because we can have a both win and lose in the same small square, but it depends on who first achieved it)
+- [ ] Notation:
+  - [ ] Add to each 'small square' the state (O, X won, Draw, None)
 - [ ] Optimization:
   - [ ] Evaluation: 
     - [ ] Make the board hold also bitboards for each square (so we don't have to calculate them every time)

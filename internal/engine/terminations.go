@@ -90,7 +90,7 @@ func (pos *Position) CheckTerminationPattern() {
 	// Check first draw condition:
 	// If our current BigIndex board,
 	// Is fully filled, thus no move is possible
-	if pos.BigIndex() != int(posIndexIllegal) && _isFilled(pos.position[pos.BigIndex()][:], PieceNone) {
+	if pos.BigIndex() != int(PosIndexIllegal) && _isFilled(pos.position[pos.BigIndex()][:], PieceNone) {
 		pos.termination = TerminationDraw
 		return
 	}

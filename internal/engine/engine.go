@@ -12,6 +12,7 @@ type Engine struct {
 	timer    *_Timer
 	result   SearchResult
 	stop     atomic.Bool
+	print    bool
 }
 
 // Initialize the package
@@ -30,8 +31,14 @@ func NewEngine() *Engine {
 }
 
 // Starting seraching for the bestmove
-func (e *Engine) Search() SearchResult {
+func (e *Engine) Search() {
 	// In the future, add some setup, maybe don't use 'main' thread
+	go e.Think(true)
+}
+
+// Search the moves, in a blocking way
+func (e *Engine) Think(print bool) SearchResult {
+	e.print = print
 	e._IterativeDeepening()
 	return e.result
 }

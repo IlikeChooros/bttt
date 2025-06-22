@@ -1,6 +1,7 @@
 package bttt
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -14,8 +15,8 @@ func TestPositionInit(t *testing.T) {
 			t.Error("p.stateList.ValidSize() != 0")
 		}
 
-		if p.BigIndex() != int(posIndexIllegal) {
-			t.Errorf("p.BigIndex()=%d, want=%d", p.BigIndex(), posIndexIllegal)
+		if p.BigIndex() != int(PosIndexIllegal) {
+			t.Errorf("p.BigIndex()=%d, want=%d", p.BigIndex(), PosIndexIllegal)
 		}
 	}
 
@@ -27,4 +28,63 @@ func TestPositionInit(t *testing.T) {
 	}
 
 	t.Run("TestFromStartPos", test)
+}
+
+func TestMakeUndoStates(t *testing.T) {
+	// Make sure that position state before making a move is the same
+	// as making one and calling undo
+
+	notations := []string{
+		StartingPosition,
+		"1x7/2o6/x8/xoxoxo3/9/9/9/9/oo7 x 3",
+		"3x5/o8/9/xox1x4/o3o4/8x/9/4o4/9 o 4",
+	}
+
+	moves := [][]PosType{
+		{MakeMove(B2, A3), MakeMove(A3, A3), MakeMove(A3, C1), MakeMove(C1, A3), MakeMove(A3, C2),
+			MakeMove(C2, A3), MakeMove(A3, C3), MakeMove(C3, A3), MakeMove(A3, B2)},
+		{MakeMove(A2, C1), MakeMove(C1, C3)},
+		{MakeMove(B2, C1), MakeMove(C1, C1), MakeMove(C1, A2), MakeMove(A2, C1)},
+	}
+
+	for i, txtpos := range notations {
+		pos := NewPosition()
+		mvpos := NewPosition()
+
+		if err := pos.FromNotation(txtpos); err != nil {
+			t.Error(err)
+		} else {
+			_ = mvpos.FromNotation(txtpos)
+
+			// Make the moves
+			for _, m := range moves[i] {
+				mvpos.MakeMove(m)
+			}
+
+			// Undo the moves
+			for range moves[i] {
+				mvpos.UndoMove()
+			}
+
+			// Compare the states
+			if mvpos.hash != pos.hash {
+				t.Errorf("Hash inequality got=%d, want=%d", mvpos.hash, pos.hash)
+			}
+			if !reflect.DeepEqual(mvpos.position, pos.position) {
+				t.Errorf("Position inequality got=%v, want=%v", mvpos.position, pos.position)
+			}
+			if !reflect.DeepEqual(mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice()) {
+				t.Errorf("Legal moves ineq got=%v, want=%v", mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice())
+			}
+			if !reflect.DeepEqual(mvpos.stateList.list, pos.stateList.list) {
+				t.Errorf("Statelists ineq got=%v, want=%v", mvpos.stateList.list, pos.stateList.list)
+			}
+			if !reflect.DeepEqual(mvpos.bigPositionState, pos.bigPositionState) {
+				t.Errorf("bigPositionStates ineq got=%v, want=%d", mvpos.bigPositionState, pos.bigPositionState)
+			}
+			if mvpos.Notation() != pos.Notation() {
+				t.Errorf("Notation ineq got=%s, want=%s", mvpos.Notation(), pos.Notation())
+			}
+		}
+	}
 }

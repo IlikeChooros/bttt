@@ -101,14 +101,14 @@ func TestInitPositionNotations(t *testing.T) {
 
 // Test move notation
 func TestMoveIllegalNotation(t *testing.T) {
-	mv := posIllegal
+	mv := PosIllegal
 
 	if mv.String() != "(none)" {
 		t.Errorf("mv.String()=%s, want=%s", mv.String(), "(none)")
 	}
 
-	if mv = MoveFromString("(none)"); mv != posIllegal {
-		t.Errorf("Expected mv == posIllegal, got=%v", mv)
+	if mv = MoveFromString("(none)"); mv != PosIllegal {
+		t.Errorf("Expected mv == PosIllegal, got=%v", mv)
 	}
 }
 
@@ -121,8 +121,8 @@ func TestMoveNotations(t *testing.T) {
 
 	moves := []PosType{
 		MakeMove(6, 6), MakeMove(5, 1), MakeMove(0, 0), MakeMove(7, 0),
-		posIllegal, posIllegal, posIllegal, posIllegal,
-		posIllegal, posIllegal, posIllegal, posIllegal,
+		PosIllegal, PosIllegal, PosIllegal, PosIllegal,
+		PosIllegal, PosIllegal, PosIllegal, PosIllegal,
 	}
 
 	for i, notation := range notations {

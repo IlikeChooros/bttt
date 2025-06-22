@@ -32,8 +32,8 @@ type SearchResult struct {
 
 // Set the score value, will set the according type of the score
 func (s *SearchResult) SetValue(value int, turn TurnType) {
-	absValue := s.Value
-	if s.Value < 0 {
+	absValue := value
+	if value < 0 {
 		absValue = -absValue
 	}
 
@@ -46,6 +46,7 @@ func (s *SearchResult) SetValue(value int, turn TurnType) {
 		}
 		s.ScoreType = MateScore
 	} else {
+		s.Value = value
 		s.ScoreType = ValueScore
 	}
 }
@@ -60,8 +61,8 @@ func (s SearchResult) String() string {
 
 // Enum for position
 const (
-	posIllegal      PosType = 255
-	posIndexIllegal PosType = 15 // same as big/small index mask
+	PosIllegal      PosType = 255
+	PosIndexIllegal PosType = 15 // same as big/small index mask
 )
 
 const (
@@ -149,7 +150,7 @@ func (pos PosType) String() string {
 // Convert given move notation (should be done with PosType.String()) to PosType
 func MoveFromString(str string) PosType {
 	if str == "(none)" || len(str) != 4 {
-		return posIllegal
+		return PosIllegal
 	}
 
 	// Helper function to make sure the coordinates are withing the range
@@ -164,5 +165,5 @@ func MoveFromString(str string) PosType {
 			int((str[2]-'a')+('3'-str[3])*3))
 	}
 
-	return posIllegal
+	return PosIllegal
 }

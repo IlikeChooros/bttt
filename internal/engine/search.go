@@ -13,6 +13,11 @@ const (
 )
 
 // var _transpTable = _NewHashTable[HashEntry](1 << 20)
+func (e *Engine) _printMsg(msg string) {
+	if e.print {
+		fmt.Print(msg)
+	}
+}
 
 func (e *Engine) _IterativeDeepening() {
 
@@ -23,20 +28,19 @@ func (e *Engine) _IterativeDeepening() {
 	beta := -MateValue
 	score := 0
 	bestscore := MateValue
-	bestmove := posIllegal
 	e.stop.Store(false)
 
 	// Don't start the search in a terminated position
 	if pos.IsTerminated() {
-		fmt.Println("terminated\nbestmove (none)")
+		e._printMsg("terminated\nbestmove (none)")
 		return
 	}
 
+	moves := pos.GenerateMoves().Slice()
 	e.timer.Reset()
 	for d := 0; !e.stop.Load() && (e.limits.infinite || d < e.limits.depth); d++ {
-		moves := pos.GenerateMoves()
 
-		for _, m := range moves.Slice() {
+		for _, m := range moves {
 			pos.MakeMove(m)
 			score = -e._NegaAlphaBeta(d, 0, -beta, -alpha)
 			pos.UndoMove()
@@ -54,7 +58,8 @@ func (e *Engine) _IterativeDeepening() {
 
 			if score > bestscore {
 				e.result.SetValue(score, e.position.Turn())
-				bestmove = m
+				e.result.Bestmove = m
+				bestscore = score
 				alpha = max(alpha, score)
 
 				// That's a mate, go back
@@ -69,19 +74,18 @@ func (e *Engine) _IterativeDeepening() {
 			}
 		}
 
-		deltatime := time.Since(e.timer.Start())
-		fmt.Printf("info depth %d score %d nps %d nodes %d time %dms\n",
-			d+1, score, // depth, score
-			(e.result.Nodes*1000)/uint64(deltatime.Milliseconds()+1), // nps
-			e.result.Nodes, deltatime.Milliseconds()) // time
+		// Get the number of milliseconds since the start
+		deltatime := max(time.Since(e.timer.Start()).Milliseconds(), 1)
+		e._printMsg(
+			fmt.Sprintf("info depth %d score %s nps %d nodes %d time %dms\n",
+				d+1, e.result.String(), // depth, score
+				(e.result.Nodes*1000)/uint64(deltatime), // nps
+				e.result.Nodes, deltatime), // nodes, time
+		)
 	}
 
 	// Print the result
-	fmt.Printf("bestmove %s\n", bestmove.String())
-
-	// Set the results
-	e.result.Bestmove = bestmove
-	e.result.Value = bestscore
+	e._printMsg(fmt.Sprintf("bestmove %s\n", e.result.Bestmove.String()))
 }
 
 func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
@@ -111,7 +115,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	pos := e.position
 	bestvalue := MateValue + depth
 	value := 0
-	// bestmove := posIllegal
+	// bestmove := PosIllegal
 
 	// Check if that's terminated node, if so return according value
 	if pos.IsTerminated() {
@@ -128,8 +132,8 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	}
 
 	// Go through the moves
-	moves := pos.GenerateMoves()
-	for _, m := range moves.Slice() {
+	moves := pos.GenerateMoves().Slice()
+	for _, m := range moves {
 
 		pos.MakeMove(m)
 		value = -e._NegaAlphaBeta(depth-1, ply+1, -beta, -alpha)

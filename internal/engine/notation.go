@@ -87,7 +87,7 @@ func (p *Position) Notation() string {
 
 	// Add the BigIndex
 	builder.WriteByte(' ')
-	if p.BigIndex() == int(posIndexIllegal) {
+	if p.BigIndex() == int(PosIndexIllegal) {
 		builder.WriteByte('-')
 	} else {
 		builder.WriteByte('0' + byte(p.BigIndex()))

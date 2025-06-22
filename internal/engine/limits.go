@@ -1,6 +1,8 @@
 package bttt
 
-import "math"
+import (
+	"math"
+)
 
 type Limits struct {
 	depth    int
@@ -10,7 +12,7 @@ type Limits struct {
 }
 
 func DefaultLimits() *Limits {
-	return &Limits{math.MaxInt, math.MaxInt, 1000, true}
+	return &Limits{math.MaxInt, math.MaxInt, math.MaxInt32, true}
 }
 
 func (l *Limits) SetAll(depth int, nodes uint64, movetime int, infinite bool) {

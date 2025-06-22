@@ -1,8 +1,9 @@
 package bttt
 
 type BoardState struct {
-	move PosType
-	turn TurnType
+	move              PosType
+	turn              TurnType
+	thisPositionState PositionState
 }
 
 // Stores the history of the position as a slice of BoardState
@@ -20,12 +21,12 @@ func NewStateList() *StateList {
 // Initialize the state list, for example after calling 'Clear'
 func (sl *StateList) Init() {
 	sl.list = make([]BoardState, 0, 10)
-	sl.Append(posIllegal, CircleTurn)
+	sl.Append(PosIllegal, CircleTurn, PositionUnResolved)
 }
 
 // Append new state
-func (sl *StateList) Append(move PosType, turn TurnType) {
-	sl.list = append(sl.list, BoardState{move, turn})
+func (sl *StateList) Append(move PosType, turn TurnType, state PositionState) {
+	sl.list = append(sl.list, BoardState{move, turn, state})
 }
 
 // Reset all states (remove them)

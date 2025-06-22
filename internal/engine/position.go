@@ -72,6 +72,7 @@ func (p *Position) MakeMove(move PosType) {
 	// Choose the piece, based on the current side to move
 	piece := PieceCross
 	lastState := p.stateList.Last()
+	posStateBefore := p.bigPositionState[bigIndex]
 
 	// Meaning last turn, cross made a move, so now it's circle's turn
 	if lastState.turn != CircleTurn {
@@ -85,7 +86,7 @@ func (p *Position) MakeMove(move PosType) {
 	p.bigPositionState[bigIndex] = _checkSquareTermination(p.position[bigIndex])
 
 	// Append new state
-	p.stateList.Append(move, !lastState.turn)
+	p.stateList.Append(move, !lastState.turn, posStateBefore)
 }
 
 // Undo last move, from the state list
@@ -102,6 +103,9 @@ func (p *Position) UndoMove() {
 	// Remove that piece from it's square
 	p.position[bigIndex][smallIndex] = PieceNone
 
+	// Restore bigPositionState
+	p.bigPositionState[bigIndex] = lastState.thisPositionState
+
 	// Restore current state
 	p.stateList.Remove()
 }
@@ -110,7 +114,7 @@ func (p *Position) UndoMove() {
 func (p *Position) IsLegal(move PosType) bool {
 
 	bi, si := move.BigIndex(), move.SmallIndex()
-	if p.BigIndex() != int(posIndexIllegal) && bi != PosType(p.BigIndex()) {
+	if p.BigIndex() != int(PosIndexIllegal) && bi != PosType(p.BigIndex()) {
 		return false
 	}
 
