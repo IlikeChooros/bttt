@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 const (
 	MateValue         = -1000000
 	MaxDepth          = 64
-	MateTresholdValue = -MateValue - MaxDepth
+	MateTresholdValue = -MateValue
 )
 
 // var _transpTable = _NewHashTable[HashEntry](1 << 20)
@@ -30,19 +30,23 @@ func (e *Engine) _IterativeDeepening() {
 	bestscore := MateValue
 	e.stop.Store(false)
 
+	moves := pos.GenerateMoves().Slice()
+	fmt.Println(moves)
+	fmt.Println(*e.position)
+	fmt.Println(*e.position.stateList)
+
 	// Don't start the search in a terminated position
 	if pos.IsTerminated() {
-		e._printMsg("terminated\nbestmove (none)")
+		e._printMsg(fmt.Sprintf("terminated %v\nbestmove (none)\n", pos.termination))
 		return
 	}
 
-	moves := pos.GenerateMoves().Slice()
 	e.timer.Reset()
 	for d := 0; !e.stop.Load() && (e.limits.infinite || d < e.limits.depth); d++ {
 
 		for _, m := range moves {
 			pos.MakeMove(m)
-			score = -e._NegaAlphaBeta(d, 0, -beta, -alpha)
+			score = -e._NegaAlphaBeta(d, 1, -beta, -alpha)
 			pos.UndoMove()
 
 			// Now check if the timer has ended, if so this move wasn't fully searched,
@@ -113,7 +117,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	// }
 
 	pos := e.position
-	bestvalue := MateValue + depth
+	bestvalue := MateValue - ply
 	value := 0
 	// bestmove := PosIllegal
 

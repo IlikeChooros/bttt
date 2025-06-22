@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 import (
 	"fmt"
@@ -46,6 +46,15 @@ func (p *Position) Notation() string {
 
 		// In each row, we will generate the small square string
 		counter := 0
+		switch p.bigPositionState[rowIndex] {
+		case PositionCircleWon:
+			builder.WriteByte('O')
+		case PositionCrossWon:
+			builder.WriteByte('X')
+		case PositionDraw:
+			builder.WriteByte('D')
+		}
+
 		for i := 0; i < 9; i++ {
 			switch rowPiece := row[i]; rowPiece {
 			case PieceCircle, PieceCross:
@@ -155,6 +164,14 @@ func _FromNotation(pos *Position, notation string) error {
 			// If that's a piece, put it on the board
 			board[bigIndex][smallIndex] = PieceFromRune(v)
 			smallIndex++
+		case 'D':
+			pos.bigPositionState[bigIndex] = PositionDraw
+		case 'O':
+			pos.bigPositionState[bigIndex] = PositionCircleWon
+		case 'X':
+			pos.bigPositionState[bigIndex] = PositionCrossWon
+		case '-':
+			pos.bigPositionState[bigIndex] = PositionUnResolved
 		case '/':
 			// Small index must be 9, before moving on to next square
 			if smallIndex != 9 {

@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 type Termination int
 
@@ -40,7 +40,9 @@ func (p *Position) IsTerminated() bool {
 func (pos *Position) SetupBoardState() {
 	// Check each small square, and set proper big square state
 	for i, square := range pos.position {
-		pos.bigPositionState[i] = _checkSquareTermination(square)
+		if pos.bigPositionState[i] == PositionUnResolved {
+			pos.bigPositionState[i] = _checkSquareTermination(square)
+		}
 	}
 }
 
@@ -90,7 +92,8 @@ func (pos *Position) CheckTerminationPattern() {
 	// Check first draw condition:
 	// If our current BigIndex board,
 	// Is fully filled, thus no move is possible
-	if pos.BigIndex() != int(PosIndexIllegal) && _isFilled(pos.position[pos.BigIndex()][:], PieceNone) {
+	moves := pos.GenerateMoves()
+	if moves.size == 0 {
 		pos.termination = TerminationDraw
 		return
 	}

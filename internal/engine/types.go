@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 import (
 	"fmt"
@@ -46,6 +46,7 @@ func (s *SearchResult) SetValue(value int, turn TurnType) {
 		}
 		s.ScoreType = MateScore
 	} else {
+		// Regular score
 		s.Value = value
 		s.ScoreType = ValueScore
 	}

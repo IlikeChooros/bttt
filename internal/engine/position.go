@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 // Constants
 
@@ -83,7 +83,9 @@ func (p *Position) MakeMove(move PosType) {
 	p.position[bigIndex][smallIndex] = piece
 
 	// Update Big board state
-	p.bigPositionState[bigIndex] = _checkSquareTermination(p.position[bigIndex])
+	if p.bigPositionState[bigIndex] == PositionUnResolved {
+		p.bigPositionState[bigIndex] = _checkSquareTermination(p.position[bigIndex])
+	}
 
 	// Append new state
 	p.stateList.Append(move, !lastState.turn, posStateBefore)
@@ -106,8 +108,16 @@ func (p *Position) UndoMove() {
 	// Restore bigPositionState
 	p.bigPositionState[bigIndex] = lastState.thisPositionState
 
+	// Restore termination
+	p.termination = TerminationNone
+
 	// Restore current state
 	p.stateList.Remove()
+}
+
+// Get the 'big position state'
+func (p *Position) BigPositionState() [9]PositionState {
+	return p.bigPositionState
 }
 
 // Check if given move is legal

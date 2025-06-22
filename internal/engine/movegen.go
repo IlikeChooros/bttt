@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 func (pos *Position) _GenerateMoves(movelist *MoveList, bigIndex int) {
 	// Go through each cell, and pick empty ones

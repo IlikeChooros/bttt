@@ -2,13 +2,35 @@ package ui
 
 import (
 	"fmt"
+	uttt "uttt/internal/engine"
 )
 
 // UltimateBoard represents a 9x9 board for Ultimate Tic Tac Toe.
 // Each cell is either 'X', 'O', or ' ' for empty.
 type UltimateBoard struct {
-	Cells    [9][9]rune
-	BigIndex int
+	Cells          [9][9]rune
+	BigIndex       int
+	BigSquareColor [9]string
+}
+
+func (board *UltimateBoard) SetColors(states [9]uttt.PositionState) {
+	// If unresolved, set the DEFAULT_BG
+	for i, state := range states {
+		switch state {
+		case uttt.PositionCircleWon:
+			board.BigSquareColor[i] = fmt.Sprintf(BG_RGB_FORMAT, 201, 140, 141)
+		case uttt.PositionCrossWon:
+			board.BigSquareColor[i] = fmt.Sprintf(BG_RGB_FORMAT, 197, 222, 164)
+		case uttt.PositionDraw:
+			board.BigSquareColor[i] = fmt.Sprintf(BG_RGB_FORMAT, 97, 97, 97)
+		case uttt.PositionUnResolved:
+			board.BigSquareColor[i] = BG_DEFAULT
+		}
+	}
+
+	if board.BigIndex != -1 {
+		board.BigSquareColor[board.BigIndex] = BG_SELECTED
+	}
 }
 
 // RenderBoard clears the terminal and renders the Ultimate Tic Tac Toe board.
@@ -41,12 +63,8 @@ func (board *UltimateBoard) RenderBoard() {
 				line += " " + BG_DEFAULT + "|"
 			}
 
-			bckgr := BG_DEFAULT
 			bigIndex, smallIndex := offsetBigIndex+(j/3), offsetSmallIndex+(j%3)
-			if board.BigIndex == -1 || board.BigIndex == bigIndex {
-				bckgr = BG_SELECTED
-			}
-
+			bckgr := board.BigSquareColor[bigIndex]
 			cell := board.Cells[bigIndex][smallIndex]
 			symbol := " "
 			switch cell {
@@ -55,7 +73,7 @@ func (board *UltimateBoard) RenderBoard() {
 			case 'O':
 				symbol = FG_O + "O" + RESET
 			}
-			line += bckgr + " " + symbol
+			line += bckgr + " " + symbol + bckgr
 		}
 		line += " " + BG_DEFAULT + "|"
 		if i%3 == 1 {

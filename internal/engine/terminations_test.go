@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 import (
 	"fmt"
@@ -32,6 +32,9 @@ func TestTerminatedPositions(t *testing.T) {
 		"ooo6/9/ooo6/9/ooo6/xoxo5/ooo6/9/ooo6 x 0",
 		// Draw, by no avaible move
 		"xoxxoxoxo/9/9/9/9/9/9/9/9 x 0",
+
+		// No termination
+		"9/2o6/1xo1x2x1/9/2x4o1/9/9/2o1x4/9 o 4",
 	}
 
 	terminations := []Termination{
@@ -40,6 +43,7 @@ func TestTerminatedPositions(t *testing.T) {
 		TerminationCrossWon,
 		TerminationCircleWon,
 		TerminationDraw,
+		TerminationNone,
 	}
 
 	pos := NewPosition()

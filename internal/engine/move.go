@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 const (
 	_moveBigIndexMask   = 0b11110000

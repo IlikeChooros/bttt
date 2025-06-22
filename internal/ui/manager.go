@@ -23,7 +23,7 @@ func NewManager() *Manager {
 	m := &Manager{
 		e:      engine.NewEngine(),
 		board:  &UltimateBoard{},
-		limits: engine.DefaultLimits(),
+		limits: engine.DefaultLimits().SetMovetime(1000),
 	}
 	return m
 }
@@ -34,7 +34,6 @@ func (m *Manager) Loop() {
 	quitCmds := map[string]bool{"quit": true, "q": true, "exit": true, "e": true}
 
 	// Initial render
-	m.limits.SetMovetime(1000)
 	fmt.Print(CLEAR_SCREEN)
 	m.updateBoard()
 	m.board.RenderBoard()
@@ -175,11 +174,13 @@ func (m *Manager) setMovetime(tokens []string) error {
 // updateBoard copies data from the engine.Position() into the UI board.
 func (m *Manager) updateBoard() {
 	pos := m.e.Position()
-	if pos.BigIndex() == int(engine.PosIllegal) {
+	if pos.BigIndex() == int(engine.PosIndexIllegal) {
 		m.board.BigIndex = -1
 	} else {
 		m.board.BigIndex = pos.BigIndex()
 	}
+
+	m.board.SetColors(m.e.Position().BigPositionState())
 
 	board := pos.Position()
 	for bi := 0; bi < 9; bi++ {

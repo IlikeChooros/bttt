@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 import (
 	"fmt"

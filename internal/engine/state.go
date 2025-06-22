@@ -1,4 +1,4 @@
-package bttt
+package uttt
 
 type BoardState struct {
 	move              PosType
