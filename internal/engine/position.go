@@ -8,7 +8,8 @@ const (
 
 // Main position struct
 type Position struct {
-	position         BoardType        // 2d array of the pieces [bigIndex][smallIndex]
+	position         BoardType // 2d array of the pieces [bigIndex][smallIndex]
+	bitboards        [9]uint16
 	bigPositionState [9]PositionState // Array of uint8's, where each one means, either cross, circle or no one won on that square
 	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
 	termination      Termination
@@ -61,6 +62,10 @@ func (p *Position) BigIndex() int {
 // Make a move on the position, switches the sides, and puts current piece
 // on the position [bigIndex][smallIndex], accepts any move
 func (p *Position) MakeMove(move PosType) {
+	if p.termination != TerminationNone {
+		return
+	}
+
 	smallIndex := move.SmallIndex()
 	bigIndex := move.BigIndex()
 

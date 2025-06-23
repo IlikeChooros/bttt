@@ -31,9 +31,6 @@ func (e *Engine) _IterativeDeepening() {
 	e.stop.Store(false)
 
 	moves := pos.GenerateMoves().Slice()
-	fmt.Println(moves)
-	fmt.Println(*e.position)
-	fmt.Println(*e.position.stateList)
 
 	// Don't start the search in a terminated position
 	if pos.IsTerminated() {

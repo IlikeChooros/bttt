@@ -100,6 +100,15 @@ func (m *Manager) handleCommand(line string) error {
 	return nil
 }
 
+func (m *Manager) makeMove(move engine.PosType) {
+	m.e.Position().MakeMove(move)
+	if m.e.Position().IsTerminated() {
+		defer PrintError("[Manager]", "Position is terminated")
+	}
+	m.updateBoard()
+	m.board.RenderBoard()
+}
+
 // handleMake attempts to play user-specified moves, then waits briefly for engine response.
 func (m *Manager) handleMake(moves []string) error {
 	for _, mvtxt := range moves {
@@ -110,20 +119,16 @@ func (m *Manager) handleMake(moves []string) error {
 		if !m.e.Position().IsLegal(mv) {
 			return fmt.Errorf("Illegal move: %s", mvtxt)
 		}
-		m.e.Position().MakeMove(mv)
+		m.makeMove(mv)
 	}
-	m.updateBoard()
-	m.board.RenderBoard()
 	fmt.Print(CLEAR_SCREEN_FROM_CURSOR)
 
 	// Let engine respond automatically
 	m.e.SetLimits(*m.limits)
 	res := m.e.Think(false)
 	if res.Bestmove != engine.PosIllegal && m.e.Position().IsLegal(res.Bestmove) {
-		m.e.Position().MakeMove(res.Bestmove)
+		m.makeMove(res.Bestmove)
 	}
-	m.updateBoard()
-	m.board.RenderBoard()
 	fmt.Print(CLEAR_SCREEN_FROM_CURSOR)
 
 	return nil
