@@ -39,9 +39,12 @@ func (p *Position) IsTerminated() bool {
 
 func (pos *Position) SetupBoardState() {
 	// Check each small square, and set proper big square state
-	for i, square := range pos.position {
+	pos.MatchBitboards()
+	for i := range pos.position {
 		if pos.bigPositionState[i] == PositionUnResolved {
-			pos.bigPositionState[i] = _checkSquareTermination(square)
+			pos.bigPositionState[i] = _checkSquareTermination(
+				pos.bitboards[1][i], pos.bitboards[0][i],
+			)
 		}
 	}
 }
@@ -57,32 +60,46 @@ func _isFilled[T comparable](arr []T, none T) bool {
 
 // Check if given 'small' square is terminated
 // TODO: use bitboards for this function
-func _checkSquareTermination(square [9]PieceType) PositionState {
+func _checkSquareTermination(crossbb, circlebb uint) PositionState {
 
-	// Check winning conditions for all patterns
-	for _, pattern := range _patterns {
-		// Check this pattern, and resolve it
-		if v := square[pattern[0]]; v == square[pattern[1]] &&
-			square[pattern[1]] == square[pattern[2]] &&
-			v != PieceNone {
-
-			state := PositionCircleWon
-			// Check if that terminates that board, meaning one of the sides won
-			if v == PieceCross {
-				state = PositionCrossWon
-			}
-			return state
+	for _, pattern := range _winningPatterns {
+		if crossbb&pattern == pattern {
+			return PositionCrossWon
+		}
+		if circlebb&pattern == pattern {
+			return PositionCircleWon
 		}
 	}
 
-	// Check draw conditions
-	// Fully filled, and no outcome, meaning that's a draw
-	if _isFilled(square[:], PieceNone) {
+	if (crossbb | circlebb) == 0b111111111 {
 		return PositionDraw
 	}
-
-	// Unresolved
 	return PositionUnResolved
+
+	// // Check winning conditions for all patterns
+	// for _, pattern := range _patterns {
+	// 	// Check this pattern, and resolve it
+	// 	if v := square[pattern[0]]; v == square[pattern[1]] &&
+	// 		square[pattern[1]] == square[pattern[2]] &&
+	// 		v != PieceNone {
+
+	// 		state := PositionCircleWon
+	// 		// Check if that terminates that board, meaning one of the sides won
+	// 		if v == PieceCross {
+	// 			state = PositionCrossWon
+	// 		}
+	// 		return state
+	// 	}
+	// }
+
+	// // Check draw conditions
+	// // Fully filled, and no outcome, meaning that's a draw
+	// if _isFilled(square[:], PieceNone) {
+	// 	return PositionDraw
+	// }
+
+	// // Unresolved
+	// return PositionUnResolved
 }
 
 func (pos *Position) CheckTerminationPattern() {
@@ -92,8 +109,8 @@ func (pos *Position) CheckTerminationPattern() {
 	// Check first draw condition:
 	// If our current BigIndex board,
 	// Is fully filled, thus no move is possible
-	moves := pos.GenerateMoves()
-	if moves.size == 0 {
+	if bi := int(pos.BigIndex()); bi != int(PosIndexIllegal) &&
+		((pos.bitboards[0][bi] | pos.bitboards[1][bi]) == 0b111111111) {
 		pos.termination = TerminationDraw
 		return
 	}

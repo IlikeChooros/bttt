@@ -3,6 +3,7 @@ package uttt
 import (
 	"fmt"
 	"strings"
+	"unsafe"
 )
 
 // Type defines for the position
@@ -58,6 +59,11 @@ func (s SearchResult) String() string {
 		return fmt.Sprintf("%dM", s.Value)
 	}
 	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
+}
+
+// Fast bool to int conversion
+func _boolToInt(v bool) int {
+	return int(*(*byte)(unsafe.Pointer(&v)))
 }
 
 // Enum for position

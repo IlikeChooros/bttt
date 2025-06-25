@@ -32,22 +32,6 @@ var pow2table [6]int = [...]int{
 	1, 2, 4, 8, 16, 32,
 }
 
-// Convert given 'small square' with given 'ourPiece' parameter, into (our bitboard, enemy bitboard)
-func toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitboard uint) {
-	// Write whole board into a bitboard
-	for i, v := range square {
-		// Evaluate square table evaluation
-		if v == ourPiece {
-			bitboard |= (1 << i)
-		} else if v != PieceNone {
-			// Enemy
-			enemy_bitboard |= (1 << i)
-		}
-	}
-
-	return bitboard, enemy_bitboard
-}
-
 // Look for patterns, and assign to each one value
 // Assign value to each result
 // When Enemy intersects our pattern: -5
@@ -70,10 +54,9 @@ func evaluatePattern(pattern, bitboard, enemy_bitboard uint) int {
 	return pattern_eval
 }
 
-func evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
+func evaluateSquare(bitboard, enemy_bitboard uint) int {
 	// Look for patterns
 	eval := 0
-	bitboard, enemy_bitboard := toBitboards(square, ourPiece)
 	square_table_eval := 0
 
 	// Calculate the piece square table for each side
@@ -106,11 +89,9 @@ func evaluateSquare(square [9]PieceType, ourPiece PieceType) int {
 func Evaluate(pos *Position) int {
 	// Assuming the position is NOT terminated
 	eval := 0
-	ourPiece := PieceCircle
 	winningState := PositionCircleWon
 
 	if pos.Turn() == CrossTurn {
-		ourPiece = PieceCross
 		winningState = PositionCrossWon
 	}
 
@@ -120,7 +101,9 @@ func Evaluate(pos *Position) int {
 
 		if state := pos.bigPositionState[i]; state == PositionUnResolved {
 			// Evaluate unresolved square
-			value += evaluateSquare(pos.position[i], ourPiece)
+			value += evaluateSquare(
+				pos.bitboards[_boolToInt(bool(pos.Turn()))][i],
+				pos.bitboards[_boolToInt(!bool(pos.Turn()))][i])
 		} else {
 			// Assign value by the square state
 			if state != PositionDraw {

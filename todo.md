@@ -55,3 +55,38 @@ Also allowing user to lookup one of the games and see the moves.
 ```
 Add simple cmd line interface, that will allow user to play against the engine.
 ```
+
+
+
+### Optimization
+
+Benchmarks:
+
+*Before optimization:*
+
+```
+goos: linux
+goarch: amd64
+pkg: uttt/internal/engine
+cpu: AMD Ryzen 9 6900HX with Radeon Graphics        
+BenchmarkMakeUndo-16            23561091                23.27 ns/op
+BenchmarkGenerateMoves-16        1279252               472.9 ns/op
+PASS
+ok      uttt/internal/engine    1.669s
+```
+
+**Using bitboards:**
+
+```
+goos: linux
+goarch: amd64
+pkg: uttt/internal/engine
+cpu: AMD Ryzen 9 6900HX with Radeon Graphics        
+BenchmarkMakeUndo-16            29519068                19.73 ns/op            0 B/op          0 allocs/op
+BenchmarkGenerateMoves-16        1929310               316.9 ns/op           128 B/op          2 allocs/op
+BenchmarkNotationLoad-16         2597977               224.5 ns/op            32 B/op          1 allocs/op
+PASS
+ok      uttt/internal/engine    2.368s
+```
+
+*(Added BenchmarkNotationLoad, to see how time in the 'GeneratMoves' we use to load the position)*

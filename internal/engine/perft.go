@@ -40,9 +40,9 @@ func _ValidPerft(position *Position, depth int) uint64 {
 	}
 
 	nodes := uint64(0)
-	moves := position.GenerateMoves()
+	moves := position.GenerateMoves().Slice()
 
-	for _, m := range moves.Slice() {
+	for _, m := range moves {
 		position.MakeMove(m)
 
 		if !position.IsTerminated() {

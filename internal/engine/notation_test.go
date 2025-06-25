@@ -140,3 +140,19 @@ func TestMoveNotations(t *testing.T) {
 		}
 	}
 }
+
+func BenchmarkNotationLoad(b *testing.B) {
+	pos := NewPosition()
+
+	notations := []string{
+		StartingPosition,
+		"1x7/2o6/x8/xoxoxo3/9/9/9/9/oo7 x 3",
+		"3x5/o8/9/xox1x4/o3o4/8x/9/4o4/9 o 4",
+		"9/2o6/1xo1x2x1/9/2x4o1/9/9/2o4x1/9 o 7",
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = pos.FromNotation(notations[i%len(notations)])
+	}
+}

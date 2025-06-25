@@ -9,7 +9,7 @@ const (
 // Main position struct
 type Position struct {
 	position         BoardType // 2d array of the pieces [bigIndex][smallIndex]
-	bitboards        [9]uint16
+	bitboards        [2][9]uint
 	bigPositionState [9]PositionState // Array of uint8's, where each one means, either cross, circle or no one won on that square
 	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
 	termination      Termination
@@ -43,6 +43,31 @@ func (p *Position) Reset() {
 	// Zero the bigPositionState
 	for i := range p.bigPositionState {
 		p.bigPositionState[i] = PositionUnResolved
+		p.bitboards[0][i] = 0
+		p.bitboards[1][i] = 0
+	}
+}
+
+// Convert given 'small square' with given 'ourPiece' parameter, into (our bitboard, enemy bitboard)
+func toBitboards(square [9]PieceType, ourPiece PieceType) (bitboard, enemy_bitboard uint) {
+	// Write whole board into a bitboard
+	for i, v := range square {
+		// Evaluate square table evaluation
+		if v == ourPiece {
+			bitboard |= (1 << i)
+		} else if v != PieceNone {
+			// Enemy
+			enemy_bitboard |= (1 << i)
+		}
+	}
+
+	return bitboard, enemy_bitboard
+}
+
+// Make sure bitboards represent the same position as the 2d arrays
+func (p *Position) MatchBitboards() {
+	for i, square := range p.position {
+		p.bitboards[1][i], p.bitboards[0][i] = toBitboards(square, PieceCross)
 	}
 }
 
@@ -80,16 +105,19 @@ func (p *Position) MakeMove(move PosType) {
 	posStateBefore := p.bigPositionState[bigIndex]
 
 	// Meaning last turn, cross made a move, so now it's circle's turn
-	if lastState.turn != CircleTurn {
+	if lastState.turn == CrossTurn {
 		piece = PieceCircle
 	}
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
+	p.bitboards[_boolToInt(bool(p.Turn()))][bigIndex] ^= (1 << smallIndex)
 
 	// Update Big board state
 	if p.bigPositionState[bigIndex] == PositionUnResolved {
-		p.bigPositionState[bigIndex] = _checkSquareTermination(p.position[bigIndex])
+		p.bigPositionState[bigIndex] = _checkSquareTermination(
+			p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
+		)
 	}
 
 	// Append new state
@@ -109,6 +137,7 @@ func (p *Position) UndoMove() {
 
 	// Remove that piece from it's square
 	p.position[bigIndex][smallIndex] = PieceNone
+	p.bitboards[_boolToInt(bool(p.Turn()))][bigIndex] ^= (1 << smallIndex)
 
 	// Restore bigPositionState
 	p.bigPositionState[bigIndex] = lastState.thisPositionState

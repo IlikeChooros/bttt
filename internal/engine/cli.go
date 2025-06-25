@@ -118,29 +118,39 @@ func (cli *Cli) parseArgument(arg string) error {
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "test")
 		}
-		// Test the move generation
-		if tokens[1] == "movegen" {
-			return _parseIntToken(2, tokens, func(depth int) {
-				now := time.Now()
-				avgtime := float64(0)
-				nodes := uint64(0)
+		return cli.handleTest(tokens[1:])
+	}
 
-				defer func() {
-					fmt.Printf("\rAvg %.1f Mnps\033[K\n", float64(nodes)/avgtime)
-				}()
+	return nil
+}
 
-				const Ntries = 10
+func (cli *Cli) handleTest(tokens []string) error {
+	// Test the move generation
+	if tokens[0] == "movegen" {
+		return _parseIntToken(1, tokens, func(depth int) {
+			now := time.Now()
+			avgtime := float64(0)
+			nodes := uint64(0)
 
-				for i := 0; i < Ntries; i++ {
-					nodes = Perft(cli.engine.position, depth, true, false)
-					avgtime += float64(time.Since(now).Microseconds()-int64(avgtime)) / float64(i+1)
-					fmt.Printf("\rProgress: %.1f (eta: %s)\033[K",
-						(float32(i+1)/Ntries)*100,
-						time.Duration(avgtime*float64(Ntries-(i+1))*1000).String())
-					now = time.Now()
-				}
-			})
-		}
+			defer func() {
+				fmt.Printf("\rAvg %.1f Mnps\033[K\n", float64(nodes)/avgtime)
+			}()
+
+			const Ntries = 10
+
+			for i := 0; i < Ntries; i++ {
+				nodes = Perft(cli.engine.position, depth, true, false)
+				avgtime += float64(time.Since(now).Microseconds()-int64(avgtime)) / float64(i+1)
+				fmt.Printf("\rProgress: %.1f (eta: %s)\033[K",
+					(float32(i+1)/Ntries)*100,
+					time.Duration(avgtime*float64(Ntries-(i+1))*1000).String())
+				now = time.Now()
+			}
+		})
+	}
+	// Test hasing values, by performing perft test up to certain depth, and see how many collisions we get
+	if tokens[0] == "" {
+
 	}
 
 	return nil

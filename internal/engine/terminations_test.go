@@ -154,7 +154,7 @@ func TestSmallSquareTermination(t *testing.T) {
 	for i, square := range squares {
 		// Run each position as a sub test
 		t.Run(fmt.Sprintf("SquareTest-%d", i+1), func(t *testing.T) {
-			state := _checkSquareTermination(square)
+			state := _checkSquareTermination(toBitboards(square, PieceCross))
 
 			if state != states[i] {
 				t.Errorf("_checkSquareTermination(%v)=%d, want=%d", square, state, states[i])

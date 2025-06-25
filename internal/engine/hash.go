@@ -66,11 +66,13 @@ func (self *_HashTable[T]) SetSize(size uint64) {
 var _hashSmallBoard = [2][9][9]uint64{} // [0] -> X [1] -> O (none -> empty square)
 var _hashBigBoard = [3][9]uint64{}      // [0] -> X [1] -> O, [2] -> Draw (none -> unresolved)
 var _hashTurn uint64
+var _hashBigIndex = [9]uint64{}
 
 // Initialize hashes for Zobrist like approach
 func _InitHashing() {
 	gen := rand.New(rand.NewSource(27))
 
+	// Hashes for the O's and X's position
 	for i := 0; i < 2; i++ {
 		for j := 0; j < 9; j++ {
 			for k := 0; k < 9; k++ {
@@ -80,6 +82,11 @@ func _InitHashing() {
 		for j := 0; j < 9; j++ {
 			_hashBigBoard[i][j] = gen.Uint64()
 		}
+	}
+
+	// Get hashes for 'big index'
+	for i := 0; i < 9; i++ {
+		_hashBigIndex[i] = gen.Uint64()
 	}
 
 	_hashTurn = gen.Uint64()
@@ -130,6 +137,11 @@ func (pos *Position) Hash() uint64 {
 	// Hash turn
 	if pos.Turn() == CrossTurn {
 		hash ^= _hashTurn
+	}
+
+	// Hash big Index
+	if pos.BigIndex() != int(PosIndexIllegal) {
+		hash ^= _hashBigIndex[pos.BigIndex()]
 	}
 
 	return hash

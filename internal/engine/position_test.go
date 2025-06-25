@@ -5,6 +5,20 @@ import (
 	"testing"
 )
 
+func TestMain(m *testing.M) {
+	_InitHashing()
+	m.Run()
+}
+
+func TestBoolToInt(t *testing.T) {
+	if _boolToInt(bool(CrossTurn)) != 1 {
+		t.Errorf("CrossTurn =%d, want = 1", _boolToInt(bool(CrossTurn)))
+	}
+	if _boolToInt(bool(CircleTurn)) != 0 {
+		t.Errorf("CircleTurn =%d, want = 0", _boolToInt(bool(CircleTurn)))
+	}
+}
+
 func TestPositionInit(t *testing.T) {
 	p := NewPosition()
 

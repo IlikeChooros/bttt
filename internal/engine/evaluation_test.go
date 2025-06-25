@@ -56,7 +56,7 @@ func TestSquareEvaluation(t *testing.T) {
 	}
 
 	for i, square := range squares {
-		eval := evaluateSquare(square, pieces[i])
+		eval := evaluateSquare(toBitboards(square, pieces[i]))
 
 		// Setup actual relative state of the square
 		state := Draw
