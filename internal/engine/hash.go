@@ -2,27 +2,36 @@ package uttt
 
 import "math/rand"
 
-type _HashEntry interface {
+type HashEntryLike interface {
+	comparable
 	empty() bool
 	depth() int
 }
 
-type HashEntry struct {
-	Depth    int
-	Hash     uint64
-	Score    int
-	NodeType EntryNodeType
-	Bestmove PosType
+type HashEntryBase struct {
+	Depth int
+	Hash  uint64
 }
 
-func (h HashEntry) empty() bool {
+// Main hash entry struct, storing depth, hash, score, node type and bestmove.
+// Used for transposition table
+type TTEntry struct {
+	HashEntryBase
+	Score    int
+	Bestmove PosType
+	NodeType EntryNodeType
+}
+
+// Interface requirements
+func (h HashEntryBase) empty() bool {
 	return h.Hash == 0
 }
 
-func (h HashEntry) depth() int {
+func (h HashEntryBase) depth() int {
 	return h.Depth
 }
 
+// Types of the hash entry nodes
 const (
 	Exact      EntryNodeType = iota // Exact value of the node (a pv node)
 	LowerBound                      // It's value if <= alpha
@@ -30,28 +39,40 @@ const (
 )
 
 // Hash table implementation
-type _HashTable[T _HashEntry] struct {
+type HashTable[T HashEntryLike] struct {
 	internal []T
 	size     uint64
 }
 
-func _NewHashTable[T _HashEntry](size uint64) *_HashTable[T] {
-	ht := _HashTable[T]{}
+func NewHashTable[T HashEntryLike](size uint64) *HashTable[T] {
+	ht := HashTable[T]{}
 	ht.internal = make([]T, size)
 	ht.size = size
 	return &ht
 }
 
-func (self *_HashTable[T]) _key(value uint64) uint64 {
+// Internal key hash function, simply modulo applied on the value
+func (self *HashTable[T]) _key(value uint64) uint64 {
 	return value % self.size
 }
 
-func (self *_HashTable[T]) Get(key uint64) (T, bool) {
+// Get the key, returns (value, exists)
+func (self *HashTable[T]) Get(key uint64) (T, bool) {
 	val := self.internal[self._key(key)]
+
+	// If T is a pointer type, an uninitialized entry will be nil.
+	// We must check for this before calling any methods on `val`.
+	var zero T
+	if val == zero {
+		return val, false
+	}
+
+	// An entry exists, now check if it's logically empty (Hash == 0).
 	return val, !val.empty()
 }
 
-func (self *_HashTable[T]) Set(key uint64, value T) {
+// Set given key's value
+func (self *HashTable[T]) Set(key uint64, value T) {
 	val, ok := self.Get(key)
 
 	// Empty, simply set the value
@@ -65,7 +86,13 @@ func (self *_HashTable[T]) Set(key uint64, value T) {
 	}
 }
 
-func (self *_HashTable[T]) SetSize(size uint64) {
+// Immiediate replacement strategy
+func (self *HashTable[T]) SetForced(key uint64, value T) {
+	self.internal[self._key(key)] = value
+}
+
+// Set new size, will either shrink the internal buffer, or grow
+func (self *HashTable[T]) SetSize(size uint64) {
 	if self.size >= size {
 		self.internal = self.internal[:size]
 	} else {
@@ -78,6 +105,31 @@ func (self *_HashTable[T]) SetSize(size uint64) {
 	self.size = size
 }
 
+// Get the load factor (fraction of non empty entries in the whole table)
+func (self *HashTable[T]) LoadFactor() float64 {
+	lf := 0.0
+
+	var zero T
+	for i, entry := range self.internal {
+		if entry == zero || entry.empty() {
+			lf -= (lf) / (float64(i + 1))
+		} else {
+			lf += (1 - lf) / (float64(i + 1))
+		}
+	}
+
+	return lf
+}
+
+// Clear the hash table
+func (self *HashTable[T]) Clear() {
+	var zero T
+	for i := range self.internal {
+		self.internal[i] = zero
+	}
+}
+
+var _seedHash int64 = 677881139300273795
 var _hashSmallBoard = [2][9][9]uint64{} // [0] -> O [1] -> X (none -> empty square)
 var _hashBigPosState = [3][9]uint64{}   // [0] -> O [1] -> X, [2] -> Draw (none -> unresolved)
 var _hashTurn uint64                    // Use if turn == CrossTurn
@@ -85,7 +137,7 @@ var _hashBigIndex = [9]uint64{}
 
 // Initialize hashes for Zobrist like approach
 func _InitHashing() {
-	gen := rand.New(rand.NewSource(27))
+	gen := rand.New(rand.NewSource(_seedHash))
 
 	// Hashes for the O's and X's position
 	for i := range 2 {

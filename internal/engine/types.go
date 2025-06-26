@@ -33,6 +33,11 @@ type SearchResult struct {
 // Set the score value, will set the according type of the score
 func (s *SearchResult) SetValue(value int, turn TurnType) {
 	absValue := value
+	turnMultipier := 1
+	if turn == CircleTurn {
+		turnMultipier = -1
+	}
+
 	if value < 0 {
 		absValue = -absValue
 	}
@@ -47,7 +52,7 @@ func (s *SearchResult) SetValue(value int, turn TurnType) {
 		s.ScoreType = MateScore
 	} else {
 		// Regular score
-		s.Value = value
+		s.Value = value * turnMultipier
 		s.ScoreType = ValueScore
 	}
 }

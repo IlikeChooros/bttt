@@ -13,12 +13,14 @@ Big Tic Tac Toe in Go:
   - [x] Add to each 'small square' the state (O, X won, Draw, None)
 - [ ] UI:
   - [ ] After termination, show the board with the winning line
-- [ ] Optimization:
+  - [ ] *Fix bug: after few moves, pieces start disappearing*
+- [x] Optimization:
   - [x] Evaluation: 
     - [x] Make the board hold also bitboards for each square (so we don't have to calculate them every time)
-  - [ ] Search:
+  - [x] Search:
     - [x] Use transposition tables:
       - [x] Zobrist hashing
+      - [x] Use better seed for hashing
 - [ ] OTHER:
   - [x] Refactor the file structure, use folders, and if possible use different folder for tests
   
@@ -104,3 +106,5 @@ I have tried:
 - Move:
   - Added piece square tables, pattern evaluation, etc.
 ```
+
+

@@ -124,6 +124,48 @@ func (cli *Cli) parseArgument(arg string) error {
 	return nil
 }
 
+type HashTestEntry struct {
+	HashEntryBase
+	notation string
+}
+
+func hashTest(depth int, pos *Position, tt *HashTable[HashTestEntry]) (uint, uint) {
+
+	if depth == 0 {
+		notation := pos.Notation()
+
+		if val, ok := tt.Get(pos.hash); ok {
+			// Check if that's a collision
+			if notation != val.notation {
+				return 1, 1
+			}
+		} else {
+			// That's an empty key, set this new value
+			tt.SetForced(pos.hash, HashTestEntry{
+				HashEntryBase: HashEntryBase{Depth: depth, Hash: pos.hash},
+				notation:      notation,
+			})
+		}
+
+		return 1, 0
+	}
+
+	// Go through the moves
+	nodes, collisions := uint(0), uint(0)
+	moves := pos.GenerateMoves().Slice()
+
+	for _, m := range moves {
+		pos.MakeMove(m)
+		n, c := hashTest(depth-1, pos, tt)
+		pos.UndoMove()
+
+		nodes += n
+		collisions += c
+	}
+
+	return nodes, collisions
+}
+
 func (cli *Cli) handleTest(tokens []string) error {
 	// Test the move generation
 	if tokens[0] == "movegen" {
@@ -148,9 +190,16 @@ func (cli *Cli) handleTest(tokens []string) error {
 			}
 		})
 	}
-	// Test hasing values, by performing perft test up to certain depth, and see how many collisions we get
-	if tokens[0] == "" {
 
+	// Test hasing values, by performing perft test up to certain depth, and see how many collisions we get
+	if tokens[0] == "hash" {
+		return _parseIntToken(1, tokens, func(i int) {
+			tt := NewHashTable[HashTestEntry](1 << 20)
+			nodes, collisions := hashTest(i, cli.engine.position, tt)
+
+			fmt.Printf("HashTest: %d nodes %d collisions (%.3f) load factor: %.3f\n",
+				nodes, collisions, float64(collisions)/float64(nodes), tt.LoadFactor())
+		})
 	}
 
 	return nil

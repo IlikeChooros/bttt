@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	// uttt.Init()
+	// uttt.OptimizeHash(40, 120)
 	// e := uttt.NewEngine()
 	// e.SetLimits(*uttt.DefaultLimits().SetDepth(10))
 	// e.Think(true)

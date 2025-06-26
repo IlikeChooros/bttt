@@ -12,7 +12,7 @@ const (
 	MateTresholdValue = -MateValue
 )
 
-var _transpTable = _NewHashTable[HashEntry](1 << 21)
+var _transpTable = NewHashTable[TTEntry](1 << 21)
 
 func (e *Engine) _printMsg(msg string) {
 	if e.print {
@@ -193,7 +193,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	}
 
 	// Set the hash entry value
-	newEntry := HashEntry{}
+	newEntry := TTEntry{}
 	newEntry.Bestmove = bestmove
 	newEntry.Depth = depth
 	newEntry.Hash = hash
