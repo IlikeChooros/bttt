@@ -12,7 +12,7 @@ type Limits struct {
 }
 
 func DefaultLimits() *Limits {
-	return &Limits{math.MaxInt, math.MaxInt, math.MaxInt32, true}
+	return &Limits{math.MaxInt, math.MaxInt, -1, true}
 }
 
 func (l *Limits) SetAll(depth int, nodes uint64, movetime int, infinite bool) {

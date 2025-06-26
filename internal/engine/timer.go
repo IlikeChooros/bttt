@@ -10,12 +10,12 @@ type _Timer struct {
 }
 
 func _NewTimer() *_Timer {
-	return &_Timer{time.Now(), 1000}
+	return &_Timer{time.Now(), -1}
 }
 
 // Check if this timer has ended
 func (t *_Timer) IsEnd() bool {
-	return time.Since(t.start) >= t.duration
+	return t.duration > 0 && time.Since(t.start) >= t.duration
 }
 
 // Set the 'start' as now
@@ -30,5 +30,9 @@ func (t *_Timer) Start() time.Time {
 
 // In milliseconds
 func (t *_Timer) Movetime(movetime int) {
-	t.duration = time.Duration(movetime) * time.Millisecond
+	if movetime < 0 {
+		t.duration = -1
+	} else {
+		t.duration = time.Duration(movetime) * time.Millisecond
+	}
 }

@@ -1,5 +1,7 @@
 package uttt
 
+import "strings"
+
 const (
 	_moveBigIndexMask   = 0b11110000
 	_moveSmallIndexMask = 0b1111
@@ -35,5 +37,19 @@ func (ml *MoveList) Slice() []PosType {
 // Appends a new move to the list of moves
 func (ml *MoveList) Append(bigIndex, smallIndex int) {
 	ml.moves[ml.size] = MakeMove(bigIndex, smallIndex)
+	ml.size++
+}
+
+// Convert movelist into a string, uses move notation with space seperation
+func (ml *MoveList) String() string {
+	strMoves := make([]string, ml.size)
+	for i, m := range ml.Slice() {
+		strMoves[i] = m.String()
+	}
+	return strings.Join(strMoves, " ")
+}
+
+func (ml *MoveList) AppendMove(move PosType) {
+	ml.moves[ml.size] = move
 	ml.size++
 }

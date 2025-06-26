@@ -18,9 +18,10 @@ type Position struct {
 
 // Create a heap-allocated, initialized Big Tic Tac Toe position
 func NewPosition() *Position {
-	b := new(Position)
-	b.Init()
-	return b
+	pos := &Position{}
+	pos.Init()
+	pos.hash = pos.Hash()
+	return pos
 }
 
 // Initialize the position
@@ -71,6 +72,19 @@ func (p *Position) MatchBitboards() {
 	}
 }
 
+func (pos *Position) SetupBoardState() {
+	// Check each small square, and set proper big square state
+	pos.MatchBitboards()
+	for i := range pos.position {
+		if pos.bigPositionState[i] == PositionUnResolved {
+			pos.bigPositionState[i] = _checkSquareTermination(
+				pos.bitboards[1][i], pos.bitboards[0][i],
+			)
+		}
+	}
+	pos.hash = pos.Hash()
+}
+
 // Getters
 func (b *Position) Position() BoardType {
 	return b.position
@@ -103,6 +117,7 @@ func (p *Position) MakeMove(move PosType) {
 	piece := PieceCross
 	lastState := p.stateList.Last()
 	posStateBefore := p.bigPositionState[bigIndex]
+	index := _boolToInt(bool(p.Turn()))
 
 	// Meaning last turn, cross made a move, so now it's circle's turn
 	if lastState.turn == CrossTurn {
@@ -111,7 +126,7 @@ func (p *Position) MakeMove(move PosType) {
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
-	p.bitboards[_boolToInt(bool(p.Turn()))][bigIndex] ^= (1 << smallIndex)
+	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
 	// Update Big board state
 	if p.bigPositionState[bigIndex] == PositionUnResolved {
@@ -134,10 +149,11 @@ func (p *Position) UndoMove() {
 	lastState := p.stateList.Last()
 	smallIndex := lastState.move.SmallIndex()
 	bigIndex := lastState.move.BigIndex()
+	index := _boolToInt(bool(lastState.turn))
 
 	// Remove that piece from it's square
 	p.position[bigIndex][smallIndex] = PieceNone
-	p.bitboards[_boolToInt(bool(p.Turn()))][bigIndex] ^= (1 << smallIndex)
+	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
 	// Restore bigPositionState
 	p.bigPositionState[bigIndex] = lastState.thisPositionState

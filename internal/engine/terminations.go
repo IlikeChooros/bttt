@@ -37,18 +37,6 @@ func (p *Position) IsTerminated() bool {
 	return p.termination != TerminationNone
 }
 
-func (pos *Position) SetupBoardState() {
-	// Check each small square, and set proper big square state
-	pos.MatchBitboards()
-	for i := range pos.position {
-		if pos.bigPositionState[i] == PositionUnResolved {
-			pos.bigPositionState[i] = _checkSquareTermination(
-				pos.bitboards[1][i], pos.bitboards[0][i],
-			)
-		}
-	}
-}
-
 // Check if given slice is filled with items other than 'none'
 func _isFilled[T comparable](arr []T, none T) bool {
 	is_filled := true

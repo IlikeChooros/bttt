@@ -113,6 +113,9 @@ func TestMakeUndoStates(t *testing.T) {
 			if mvpos.IsTerminated() != pos.IsTerminated() {
 				t.Errorf("Termination status ineq got=%t, want=%t", mvpos.IsTerminated(), pos.IsTerminated())
 			}
+			if !reflect.DeepEqual(mvpos.bitboards, pos.bitboards) {
+				t.Errorf("Bitboards ineq got=%v, want=%v", mvpos.bitboards, pos.bitboards)
+			}
 		}
 	}
 }

@@ -13,6 +13,7 @@ type Engine struct {
 	result   SearchResult
 	stop     atomic.Bool
 	print    bool
+	pv       *MoveList
 }
 
 // Initialize the package
@@ -27,6 +28,7 @@ func NewEngine() *Engine {
 	e.limits = DefaultLimits()
 	e.result = SearchResult{}
 	e.timer = _NewTimer()
+	e.pv = NewMoveList()
 	return e
 }
 
@@ -56,4 +58,8 @@ func (e *Engine) SetLimits(limits Limits) {
 
 func (e *Engine) Stop() {
 	e.stop.Store(true)
+}
+
+func (e *Engine) Pv() *MoveList {
+	return e.pv
 }

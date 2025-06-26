@@ -4,18 +4,23 @@ import "math/rand"
 
 type _HashEntry interface {
 	empty() bool
+	depth() int
 }
 
 type HashEntry struct {
-	depth    int
-	hash     uint64
-	score    int
-	nodeType EntryNodeType
-	bestmove PosType
+	Depth    int
+	Hash     uint64
+	Score    int
+	NodeType EntryNodeType
+	Bestmove PosType
 }
 
 func (h HashEntry) empty() bool {
-	return h.hash == 0
+	return h.Hash == 0
+}
+
+func (h HashEntry) depth() int {
+	return h.Depth
 }
 
 const (
@@ -47,7 +52,17 @@ func (self *_HashTable[T]) Get(key uint64) (T, bool) {
 }
 
 func (self *_HashTable[T]) Set(key uint64, value T) {
-	self.internal[self._key(key)] = value
+	val, ok := self.Get(key)
+
+	// Empty, simply set the value
+	if !ok {
+		self.internal[self._key(key)] = value
+	} else {
+		// See it current depth is bigger, than the value's
+		if val.depth() < value.depth() {
+			self.internal[self._key(key)] = value
+		}
+	}
 }
 
 func (self *_HashTable[T]) SetSize(size uint64) {
@@ -63,9 +78,9 @@ func (self *_HashTable[T]) SetSize(size uint64) {
 	self.size = size
 }
 
-var _hashSmallBoard = [2][9][9]uint64{} // [0] -> X [1] -> O (none -> empty square)
-var _hashBigBoard = [3][9]uint64{}      // [0] -> X [1] -> O, [2] -> Draw (none -> unresolved)
-var _hashTurn uint64
+var _hashSmallBoard = [2][9][9]uint64{} // [0] -> O [1] -> X (none -> empty square)
+var _hashBigBoard = [3][9]uint64{}      // [0] -> O [1] -> X, [2] -> Draw (none -> unresolved)
+var _hashTurn uint64                    // Use if turn == CrossTurn
 var _hashBigIndex = [9]uint64{}
 
 // Initialize hashes for Zobrist like approach
@@ -122,8 +137,8 @@ func (pos *Position) Hash() uint64 {
 	}
 
 	// Hash all smaller boards state
-	for bi := 0; bi < 9; bi++ {
-		for si := 0; si < 9; si++ {
+	for bi := range 9 {
+		for si := range 9 {
 			if piece := pos.position[bi][si]; piece != PieceNone {
 				if piece == PieceCircle {
 					hash ^= _hashSmallBoard[OIndex][bi][si]

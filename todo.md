@@ -90,3 +90,5 @@ ok      uttt/internal/engine    2.368s
 ```
 
 *(Added BenchmarkNotationLoad, to see how time in the 'GeneratMoves' we use to load the position)*
+Current perft results:
+perft 10: `Nodes: 18466787808 (112.0 Mnps)`

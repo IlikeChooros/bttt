@@ -210,7 +210,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 	// Run the engine
 	if err == nil {
 		cli.engine.SetLimits(*limits)
-		cli.engine.Search()
+		cli.engine.Think(true)
 	}
 
 	return err
