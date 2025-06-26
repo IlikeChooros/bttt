@@ -24,7 +24,7 @@ func (h HashEntry) depth() int {
 }
 
 const (
-	Exact      EntryNodeType = iota // Exact value of the node (a pvs node)
+	Exact      EntryNodeType = iota // Exact value of the node (a pv node)
 	LowerBound                      // It's value if <= alpha
 	UpperBound                      // This node caused a beta-cutoff (beta >= alpha)
 )
@@ -58,7 +58,7 @@ func (self *_HashTable[T]) Set(key uint64, value T) {
 	if !ok {
 		self.internal[self._key(key)] = value
 	} else {
-		// See it current depth is bigger, than the value's
+		// See it current depth is greater, than the value's
 		if val.depth() < value.depth() {
 			self.internal[self._key(key)] = value
 		}
@@ -79,7 +79,7 @@ func (self *_HashTable[T]) SetSize(size uint64) {
 }
 
 var _hashSmallBoard = [2][9][9]uint64{} // [0] -> O [1] -> X (none -> empty square)
-var _hashBigBoard = [3][9]uint64{}      // [0] -> O [1] -> X, [2] -> Draw (none -> unresolved)
+var _hashBigPosState = [3][9]uint64{}   // [0] -> O [1] -> X, [2] -> Draw (none -> unresolved)
 var _hashTurn uint64                    // Use if turn == CrossTurn
 var _hashBigIndex = [9]uint64{}
 
@@ -88,19 +88,19 @@ func _InitHashing() {
 	gen := rand.New(rand.NewSource(27))
 
 	// Hashes for the O's and X's position
-	for i := 0; i < 2; i++ {
-		for j := 0; j < 9; j++ {
-			for k := 0; k < 9; k++ {
+	for i := range 2 {
+		for j := range 9 {
+			for k := range 9 {
 				_hashSmallBoard[i][j][k] = gen.Uint64()
 			}
 		}
-		for j := 0; j < 9; j++ {
-			_hashBigBoard[i][j] = gen.Uint64()
+		for j := range 9 {
+			_hashBigPosState[i][j] = gen.Uint64()
 		}
 	}
 
 	// Get hashes for 'big index'
-	for i := 0; i < 9; i++ {
+	for i := range 9 {
 		_hashBigIndex[i] = gen.Uint64()
 	}
 
@@ -116,8 +116,8 @@ func (pos *Position) Hash() uint64 {
 	var hash uint64 = 0
 
 	const (
-		XIndex = 0
-		OIndex = 1
+		OIndex = 0
+		XIndex = 1
 	)
 
 	// Hash 'big' position state
@@ -133,7 +133,7 @@ func (pos *Position) Hash() uint64 {
 			stateIndex = 2
 		}
 
-		hash ^= _hashBigBoard[stateIndex][i]
+		hash ^= _hashBigPosState[stateIndex][i]
 	}
 
 	// Hash all smaller boards state
@@ -155,7 +155,7 @@ func (pos *Position) Hash() uint64 {
 	}
 
 	// Hash big Index
-	if pos.BigIndex() != int(PosIndexIllegal) {
+	if pos.BigIndex() != PosIndexIllegal {
 		hash ^= _hashBigIndex[pos.BigIndex()]
 	}
 

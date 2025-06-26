@@ -94,8 +94,24 @@ func (b *Position) Turn() TurnType {
 	return !b.stateList.Last().turn
 }
 
-func (p *Position) BigIndex() int {
-	return int(p.stateList.NextBigIndex())
+func (p *Position) BigIndex() PosType {
+	return p.stateList.NextBigIndex()
+}
+
+func (p *Position) _UpdateBigPosHash(state PositionState, bigIndex PosType) {
+	// Update the hash
+	idx := -1
+	if state == PositionCrossWon {
+		idx = 1
+	} else if state == PositionCircleWon {
+		idx = 0
+	} else if state == PositionDraw {
+		idx = 2
+	}
+
+	if idx != -1 {
+		p.hash ^= _hashBigPosState[idx][bigIndex]
+	}
 }
 
 // Make a move on the position, switches the sides, and puts current piece
@@ -114,25 +130,38 @@ func (p *Position) MakeMove(move PosType) {
 	}
 
 	// Choose the piece, based on the current side to move
-	piece := PieceCross
+	piece := PieceCircle
 	lastState := p.stateList.Last()
 	posStateBefore := p.bigPositionState[bigIndex]
 	index := _boolToInt(bool(p.Turn()))
 
 	// Meaning last turn, cross made a move, so now it's circle's turn
-	if lastState.turn == CrossTurn {
-		piece = PieceCircle
+	if p.Turn() == CrossTurn {
+		piece = PieceCross
 	}
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
 	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
+	// Update hash
+	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
+	p.hash ^= _hashTurn
+	// Remove previous big index hash
+	if p.BigIndex() != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[p.BigIndex()]
+	}
+	// Set new 'big index'
+	p.hash ^= _hashBigIndex[smallIndex]
+
 	// Update Big board state
 	if p.bigPositionState[bigIndex] == PositionUnResolved {
 		p.bigPositionState[bigIndex] = _checkSquareTermination(
 			p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
 		)
+
+		// Update the hash
+		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 	}
 
 	// Append new state
@@ -155,6 +184,16 @@ func (p *Position) UndoMove() {
 	p.position[bigIndex][smallIndex] = PieceNone
 	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
+	// Remove piece's, turn's and bigPositionState's hash
+	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
+	p.hash ^= _hashTurn
+	p.hash ^= _hashBigIndex[p.BigIndex()]
+
+	// If this moved change the big position state, update the hash
+	if lastState.thisPositionState != p.bigPositionState[bigIndex] {
+		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
+	}
+
 	// Restore bigPositionState
 	p.bigPositionState[bigIndex] = lastState.thisPositionState
 
@@ -163,6 +202,11 @@ func (p *Position) UndoMove() {
 
 	// Restore current state
 	p.stateList.Remove()
+
+	// Add previous big index hash
+	if bi := p.BigIndex(); bi != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[bi]
+	}
 }
 
 // Get the 'big position state'
@@ -174,7 +218,7 @@ func (p *Position) BigPositionState() [9]PositionState {
 func (p *Position) IsLegal(move PosType) bool {
 
 	bi, si := move.BigIndex(), move.SmallIndex()
-	if p.BigIndex() != int(PosIndexIllegal) && bi != PosType(p.BigIndex()) {
+	if p.BigIndex() != PosIndexIllegal && bi != PosType(p.BigIndex()) {
 		return false
 	}
 

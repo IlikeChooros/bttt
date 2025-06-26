@@ -179,10 +179,10 @@ func (m *Manager) setMovetime(tokens []string) error {
 // updateBoard copies data from the engine.Position() into the UI board.
 func (m *Manager) updateBoard() {
 	pos := m.e.Position()
-	if pos.BigIndex() == int(engine.PosIndexIllegal) {
+	if pos.BigIndex() == engine.PosIndexIllegal {
 		m.board.BigIndex = -1
 	} else {
-		m.board.BigIndex = pos.BigIndex()
+		m.board.BigIndex = int(pos.BigIndex())
 	}
 
 	m.board.SetColors(m.e.Position().BigPositionState())

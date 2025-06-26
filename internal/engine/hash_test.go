@@ -28,7 +28,7 @@ func TestHashUpdate(t *testing.T) {
 		if err := pos.FromNotation(notation); err != nil {
 			t.Error(err)
 		} else {
-			before := pos.Hash()
+			before := pos.hash
 
 			// Go through the moves, and undo them
 			for _, m := range moves[i] {
@@ -40,10 +40,10 @@ func TestHashUpdate(t *testing.T) {
 			}
 
 			// Hash should be the same
-			after := pos.Hash()
+			after := pos.hash
 
 			if before != after {
-				t.Errorf("Hash mismatch: got=%d, want=%d", after, before)
+				t.Errorf("%s Hash mismatch: got=%d, want=%d", notation, after, before)
 			}
 		}
 	}

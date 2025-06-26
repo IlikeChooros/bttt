@@ -5,7 +5,7 @@ import (
 )
 
 // horizontal, vertical and diagonal patterns as bitboards
-var _winningPatterns [8]uint = [...]uint{
+var _winningBitboardPatterns [8]uint = [...]uint{
 	0b111000000, 0b000111000, 0b000000111,
 	0b100100100, 0b010010010, 0b001001001,
 	0b100010001, 0b001010100,
@@ -24,7 +24,7 @@ var _winningBigSquareValue int = 50
 // Multiplier, for each 'small' square
 var _bigSquareTableFactors [9]float32 = [...]float32{
 	1.0, 0.8, 1.0,
-	0.8, 1.6, 0.8,
+	0.8, 1.2, 0.8,
 	1.0, 0.8, 1.0,
 }
 
@@ -73,7 +73,7 @@ func evaluateSquare(bitboard, enemy_bitboard uint) int {
 
 	// Evaluate patterns
 	pattern_eval := 0
-	for _, pattern := range _winningPatterns {
+	for _, pattern := range _winningBitboardPatterns {
 		// Evaluate our patterns
 		pattern_eval += evaluatePattern(pattern, bitboard, enemy_bitboard)
 		pattern_eval -= evaluatePattern(pattern, enemy_bitboard, bitboard)

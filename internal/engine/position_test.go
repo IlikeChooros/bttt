@@ -29,7 +29,7 @@ func TestPositionInit(t *testing.T) {
 			t.Error("p.stateList.ValidSize() != 0")
 		}
 
-		if p.BigIndex() != int(PosIndexIllegal) {
+		if p.BigIndex() != PosIndexIllegal {
 			t.Errorf("p.BigIndex()=%d, want=%d", p.BigIndex(), PosIndexIllegal)
 		}
 	}

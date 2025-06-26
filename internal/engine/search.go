@@ -28,11 +28,11 @@ func (e *Engine) _LoadPv(rootmove PosType) {
 	e.position.MakeMove(rootmove)
 
 	// Go through the transposition table
-	val, ok := _transpTable.Get(e.position.Hash())
+	val, ok := _transpTable.Get(e.position.hash)
 	for ; ok && depth < MaxDepth && val.Bestmove != PosIllegal; depth++ {
 		e.pv.AppendMove(val.Bestmove)
 		e.position.MakeMove(val.Bestmove)
-		val, ok = _transpTable.Get(e.position.Hash())
+		val, ok = _transpTable.Get(e.position.hash)
 	}
 
 	// Undo the moves
@@ -123,7 +123,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	// of bigger or equal to depth of our current node's depth
 
 	oldAlpha := alpha
-	hash := e.position.Hash()
+	hash := e.position.hash
 	if val, ok := _transpTable.Get(hash); ok && val.Depth >= depth {
 		// Use the cached value
 		if val.NodeType == Exact {
