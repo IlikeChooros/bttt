@@ -20,16 +20,24 @@ func (e *Engine) _printMsg(msg string) {
 	}
 }
 
+func (e *Engine) _GetPvMove(ply int) PosType {
+	if ply >= int(e.pv.size) {
+		return PosIllegal
+	}
+	return e.pv.moves[ply]
+}
+
 // Get the principal variation from the transpostion table
-func (e *Engine) _LoadPv(rootmove PosType) {
+func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
 	e.pv.Clear()
 	depth := 0
 
 	e.position.MakeMove(rootmove)
+	e.pv.AppendMove(rootmove)
 
 	// Go through the transposition table
 	val, ok := _transpTable.Get(e.position.hash)
-	for ; ok && depth < MaxDepth && val.Bestmove != PosIllegal; depth++ {
+	for ; ok && depth < maxdepth && val.Bestmove != PosIllegal; depth++ {
 		e.pv.AppendMove(val.Bestmove)
 		e.position.MakeMove(val.Bestmove)
 		val, ok = _transpTable.Get(e.position.hash)
@@ -63,7 +71,7 @@ func (e *Engine) _IterativeDeepening() {
 	}
 
 	e.timer.Reset()
-	for d := 0; !e.stop.Load() && (e.limits.infinite || d < e.limits.depth); d++ {
+	for d := 0; !e.stop.Load() && (d < MaxDepth && (e.limits.infinite || d < e.limits.depth)); d++ {
 
 		for _, m := range moves {
 			pos.MakeMove(m)
@@ -100,7 +108,7 @@ func (e *Engine) _IterativeDeepening() {
 		}
 
 		// Get the number of milliseconds since the start
-		e._LoadPv(e.result.Bestmove)
+		e._LoadPv(e.result.Bestmove, d+1)
 		deltatime := max(time.Since(e.timer.Start()).Milliseconds(), 1)
 		e._printMsg(
 			fmt.Sprintf("info depth %d score %s nps %d nodes %d time %dms pv %s\n",
@@ -159,8 +167,10 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	}
 
 	// Go through the moves
-	moves := pos.GenerateMoves().Slice()
-	for _, m := range moves {
+	moves := pos.GenerateMoves()
+	// MoveOrdering(moves, e.position, e._GetPvMove(ply), ply)
+
+	for _, m := range moves.Slice() {
 
 		pos.MakeMove(m)
 		value = -e._NegaAlphaBeta(depth-1, ply+1, -beta, -alpha)
@@ -192,6 +202,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 	if bestvalue >= beta {
 		// Beta cutoff
 		newEntry.NodeType = UpperBound
+		// _UpdateHistory(_boolToInt(bool(e.position.Turn())), bestmove, depth*depth)
 	}
 	if bestvalue <= oldAlpha {
 		// Lowerbound value

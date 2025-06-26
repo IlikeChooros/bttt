@@ -14,14 +14,11 @@ Big Tic Tac Toe in Go:
 - [ ] UI:
   - [ ] After termination, show the board with the winning line
 - [ ] Optimization:
-  - [ ] Evaluation: 
-    - [ ] Make the board hold also bitboards for each square (so we don't have to calculate them every time)
+  - [x] Evaluation: 
+    - [x] Make the board hold also bitboards for each square (so we don't have to calculate them every time)
   - [ ] Search:
-    - [ ] Use transposition tables:
-      - [ ] Instead of creating a perftect hash (using 9 * 18 bits to store the whole position), find such 'magic' number that will 
-    - [ ] Add move ordering
-    - [ ] Use killer moves
-    - [ ] Use history heuristic
+    - [x] Use transposition tables:
+      - [x] Zobrist hashing
 - [ ] OTHER:
   - [x] Refactor the file structure, use folders, and if possible use different folder for tests
   
@@ -92,3 +89,18 @@ ok      uttt/internal/engine    2.368s
 *(Added BenchmarkNotationLoad, to see how time in the 'GeneratMoves' we use to load the position)*
 Current perft results:
 perft 10: `Nodes: 18466787808 (112.0 Mnps)`
+
+
+### Killer moves, history heuristic, etc.
+
+```
+Apparently, history heuristic is not that useful in this game.
+It literally doesn't matter if we use move ordering or not.
+I have tried several different approaches, and the results are always the same.
+I have tried:
+- History heuristic:
+  - simple formula, if beta cutoff occurs, set the history value to depth*depth at [side][bigindex][smallindex]
+  - using gravity formula
+- Move:
+  - Added piece square tables, pattern evaluation, etc.
+```
