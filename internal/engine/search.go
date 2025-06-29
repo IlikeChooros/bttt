@@ -2,6 +2,7 @@ package uttt
 
 import (
 	"fmt"
+	"slices"
 	"time"
 )
 
@@ -38,6 +39,11 @@ func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
 	// Go through the transposition table
 	val, ok := _transpTable.Get(e.position.hash)
 	for ; ok && depth < maxdepth && val.Bestmove != PosIllegal; depth++ {
+		// Generate legal moves and see if that's a valid move
+		if !slices.Contains(e.position.GenerateMoves().Slice(), val.Bestmove) {
+			break
+		}
+
 		e.pv.AppendMove(val.Bestmove)
 		e.position.MakeMove(val.Bestmove)
 		val, ok = _transpTable.Get(e.position.hash)

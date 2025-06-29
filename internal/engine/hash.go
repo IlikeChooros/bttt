@@ -4,7 +4,7 @@ import "math/rand"
 
 type HashEntryLike interface {
 	comparable
-	empty() bool
+	valid(hash uint64) bool
 	depth() int
 }
 
@@ -23,8 +23,8 @@ type TTEntry struct {
 }
 
 // Interface requirements
-func (h HashEntryBase) empty() bool {
-	return h.Hash == 0
+func (h HashEntryBase) valid(expected uint64) bool {
+	return h.Hash != 0 && h.Hash == expected
 }
 
 func (h HashEntryBase) depth() int {
@@ -67,8 +67,8 @@ func (self *HashTable[T]) Get(key uint64) (T, bool) {
 		return val, false
 	}
 
-	// An entry exists, now check if it's logically empty (Hash == 0).
-	return val, !val.empty()
+	// An entry exists, now check if it's logically valid (Hash != 0 && Hash == key).
+	return val, val.valid(key)
 }
 
 // Set given key's value
@@ -111,7 +111,7 @@ func (self *HashTable[T]) LoadFactor() float64 {
 
 	var zero T
 	for i, entry := range self.internal {
-		if entry == zero || entry.empty() {
+		if entry == zero {
 			lf -= (lf) / (float64(i + 1))
 		} else {
 			lf += (1 - lf) / (float64(i + 1))

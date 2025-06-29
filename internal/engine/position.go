@@ -160,7 +160,7 @@ func (p *Position) MakeMove(move PosType) {
 			p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
 		)
 
-		// Update the hash
+		// Update the big position state hash hash
 		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 	}
 
