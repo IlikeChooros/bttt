@@ -124,27 +124,18 @@ func (cli *Cli) parseArgument(arg string) error {
 	return nil
 }
 
-type HashTestEntry struct {
-	HashEntryBase
-	notation string
-}
-
-func hashTest(depth int, pos *Position, tt *HashTable[HashTestEntry]) (uint, uint) {
+func hashTest(depth int, pos *Position, tt *HashTable[HashEntryBase]) (uint, uint) {
 
 	if depth == 0 {
-		notation := pos.Notation()
 
-		if val, ok := tt.Get(pos.hash); ok {
+		if val, _ := tt.Get(pos.hash); val.Hash != 0 {
 			// Check if that's a collision
-			if notation != val.notation {
+			if pos.hash != val.Hash {
 				return 1, 1
 			}
 		} else {
 			// That's an empty key, set this new value
-			tt.SetForced(pos.hash, HashTestEntry{
-				HashEntryBase: HashEntryBase{Depth: depth, Hash: pos.hash},
-				notation:      notation,
-			})
+			tt.SetForced(pos.hash, HashEntryBase{Depth: depth, Hash: pos.hash})
 		}
 
 		return 1, 0
@@ -194,7 +185,7 @@ func (cli *Cli) handleTest(tokens []string) error {
 	// Test hasing values, by performing perft test up to certain depth, and see how many collisions we get
 	if tokens[0] == "hash" {
 		return _parseIntToken(1, tokens, func(i int) {
-			tt := NewHashTable[HashTestEntry](1 << 20)
+			tt := NewHashTable[HashEntryBase](1 << 20)
 			nodes, collisions := hashTest(i, cli.engine.position, tt)
 
 			fmt.Printf("HashTest: %d nodes %d collisions (%.3f) load factor: %.3f\n",

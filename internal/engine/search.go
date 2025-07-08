@@ -8,25 +8,26 @@ import (
 
 // Mate value for the search
 const (
-	MateValue         = -1000000
 	MaxDepth          = 64
+	MateValue         = -1000000
+	MinValue          = MateValue - MaxDepth
 	MateTresholdValue = -MateValue
 )
 
 var _transpTable = NewHashTable[TTEntry](1 << 21)
 
-func (e *Engine) _printMsg(msg string) {
+func (e *Engine) _PrintMsg(msg string) {
 	if e.print {
-		fmt.Print(msg)
+		fmt.Fprint(e.writer, msg)
 	}
 }
 
-func (e *Engine) _GetPvMove(ply int) PosType {
-	if ply >= int(e.pv.size) {
-		return PosIllegal
-	}
-	return e.pv.moves[ply]
-}
+// func (e *Engine) _GetPvMove(ply int) PosType {
+// 	if ply >= int(e.pv.size) {
+// 		return PosIllegal
+// 	}
+// 	return e.pv.moves[ply]
+// }
 
 // Get the principal variation from the transpostion table
 func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
@@ -65,20 +66,19 @@ func (e *Engine) _IterativeDeepening() {
 	alpha := MateValue
 	beta := -MateValue
 	score := 0
-	bestscore := MateValue
+	bestscore := MinValue
 	e.stop.Store(false)
 
 	moves := pos.GenerateMoves().Slice()
 
 	// Don't start the search in a terminated position
 	if pos.IsTerminated() {
-		e._printMsg(fmt.Sprintf("terminated %v\nbestmove (none)\n", pos.termination))
+		e._PrintMsg(fmt.Sprintf("terminated %v\nbestmove (none)\n", pos.termination))
 		return
 	}
 
 	e.timer.Reset()
 	for d := 0; !e.stop.Load() && (d < MaxDepth && (e.limits.infinite || d < e.limits.depth)); d++ {
-
 		for _, m := range moves {
 			pos.MakeMove(m)
 			score = -e._NegaAlphaBeta(d, 1, -beta, -alpha)
@@ -113,10 +113,13 @@ func (e *Engine) _IterativeDeepening() {
 			}
 		}
 
+		// Reset
+		bestscore = MinValue
+
 		// Get the number of milliseconds since the start
 		e._LoadPv(e.result.Bestmove, d+1)
 		deltatime := max(time.Since(e.timer.Start()).Milliseconds(), 1)
-		e._printMsg(
+		e._PrintMsg(
 			fmt.Sprintf("info depth %d score %s nps %d nodes %d time %dms pv %s\n",
 				d+1, e.result.String(), // depth, score
 				(e.result.Nodes*1000)/uint64(deltatime), // nps
@@ -126,7 +129,7 @@ func (e *Engine) _IterativeDeepening() {
 	}
 
 	// Print the result
-	e._printMsg(fmt.Sprintf("bestmove %s\n", e.result.Bestmove.String()))
+	e._PrintMsg(fmt.Sprintf("bestmove %s\n", e.result.Bestmove.String()))
 }
 
 func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {

@@ -189,7 +189,7 @@ func (p *Position) UndoMove() {
 	p.hash ^= _hashTurn
 	p.hash ^= _hashBigIndex[p.BigIndex()]
 
-	// If this moved change the big position state, update the hash
+	// If this move had changed the big position state, update the hash
 	if lastState.thisPositionState != p.bigPositionState[bigIndex] {
 		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 	}

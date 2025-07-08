@@ -1,6 +1,10 @@
 package uttt
 
-import "sync/atomic"
+import (
+	"io"
+	"os"
+	"sync/atomic"
+)
 
 /*
 Main engine class, allowing user to make moves on the board,
@@ -14,6 +18,7 @@ type Engine struct {
 	stop     atomic.Bool
 	print    bool
 	pv       *MoveList
+	writer   io.Writer
 }
 
 // Initialize the package
@@ -29,7 +34,13 @@ func NewEngine() *Engine {
 	e.result = SearchResult{}
 	e.timer = _NewTimer()
 	e.pv = NewMoveList()
+	e.writer = os.Stdout
 	return e
+}
+
+// Set the output stream of the engine, by default uses standard output
+func (e *Engine) SetWriter(writer io.Writer) {
+	e.writer = writer
 }
 
 // Starting seraching for the bestmove

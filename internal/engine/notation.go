@@ -20,7 +20,7 @@ const _notationNumberOfSections int = 3
 //
 // For example, let X be:
 //
-//	o | x |x
+//	o | x | x
 //
 // ----------
 //
@@ -34,10 +34,38 @@ const _notationNumberOfSections int = 3
 //
 //	oxxxo1o2
 //
+// However, if this board is terminated, we add at the begining
+// a flag indicating it's state (see that in the example above there is no termination flag)
+//
+//	o | x | x
+//
+// ----------
+//
+//	o | x |
+//
+// ----------
+//
+//	o | x |
+//
+// Here both O and X could win, however it only counts for the side that achieved it first
+// Format of this position could be:
+//
+//	Xoxxox1ox1
+//	Ooxxox1ox1
+//
+// In the first case, the X would win on that square, and on the other one - O.
+// If there is a draw - D flag is used
+//
 // <turn> - either 'o' or 'x'
 //
 // <big index> - where should current player make move on the
 // big plane, it is an integer between 0 and 9, or - if player can move anywhere
+//
+// Examples:
+//
+// * 9/9/9/9/9/9/9/9/9 x -
+//
+// * 9/9/9/7x1/4xo3/8x/9/4o4/o8 x 0
 func (p *Position) Notation() string {
 	builder := strings.Builder{}
 

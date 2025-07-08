@@ -34,21 +34,20 @@ type SearchResult struct {
 func (s *SearchResult) SetValue(value int, turn TurnType) {
 	absValue := value
 	turnMultipier := 1
+	sign := 1
 	if turn == CircleTurn {
 		turnMultipier = -1
 	}
 
 	if value < 0 {
+		sign = -1
 		absValue = -absValue
 	}
 
 	// That's a mate score
 	if absValue >= MateTresholdValue {
 		// mate in <n> ply
-		s.Value = absValue - MateTresholdValue
-		if turn == CircleTurn {
-			s.Value = -s.Value
-		}
+		s.Value = (absValue - MateTresholdValue) * turnMultipier * sign
 		s.ScoreType = MateScore
 	} else {
 		// Regular score

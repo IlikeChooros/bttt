@@ -15,7 +15,7 @@ func OptimizeHash(nTries, timeoutSec int) {
 	}
 
 	pos := NewPosition()
-	tt := NewHashTable[HashTestEntry](1 << 22)
+	tt := NewHashTable[HashEntryBase](1 << 22)
 	collisions := make([][]int64, nTries)
 	timer := time.NewTimer(time.Second * time.Duration(timeoutSec))
 	bestSeed := int64(-1)
