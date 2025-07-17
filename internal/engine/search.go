@@ -117,11 +117,11 @@ func (e *Engine) _IterativeDeepening() {
 		// Get the number of milliseconds since the start
 		e._LoadPv(e.result.Bestmove, d+1)
 		deltatime := max(time.Since(e.timer.Start()).Milliseconds(), 1)
+		e.result.Nps = (e.result.Nodes * 1000) / uint64(deltatime)
 		e._PrintMsg(
 			fmt.Sprintf("info depth %d score %s nps %d nodes %d time %dms pv %s\n",
 				d+1, e.result.String(), // depth, score
-				(e.result.Nodes*1000)/uint64(deltatime), // nps
-				e.result.Nodes, deltatime, // nodes, time
+				e.result.Nps, e.result.Nodes, deltatime, // nps, nodes, time
 				e.pv.String(), // pv
 			))
 	}

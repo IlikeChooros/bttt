@@ -34,6 +34,10 @@ func (ml *MoveList) Slice() []PosType {
 	return ml.moves[0:ml.size]
 }
 
+func (ml *MoveList) Size() int {
+	return int(ml.size)
+}
+
 // Appends a new move to the list of moves
 func (ml *MoveList) Append(bigIndex, smallIndex int) {
 	ml.moves[ml.size] = MakeMove(bigIndex, smallIndex)

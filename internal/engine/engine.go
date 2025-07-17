@@ -12,15 +12,16 @@ Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
 */
 type Engine struct {
-	position *Position
-	limits   *Limits
-	timer    *_Timer
-	ttable   *HashTable[TTEntry]
-	result   SearchResult
-	stop     atomic.Bool
-	print    bool
-	pv       *MoveList
-	writer   io.Writer
+	position   *Position
+	limits     *Limits
+	timer      *_Timer
+	ttable     *HashTable[TTEntry]
+	result     SearchResult
+	stop       atomic.Bool
+	print      bool
+	isThinking atomic.Bool
+	pv         *MoveList
+	writer     io.Writer
 }
 
 // Initialize the package
@@ -54,14 +55,28 @@ func (e *Engine) Search() {
 
 // Search the moves, in a blocking way
 func (e *Engine) Think(print bool) SearchResult {
+	e.isThinking.Store(true)
 	e.print = print
 	e._IterativeDeepening()
+	e.isThinking.Store(false)
 	return e.result
+}
+
+func (e *Engine) IsThinking() bool {
+	return e.isThinking.Load()
 }
 
 // Get the position object
 func (e *Engine) Position() *Position {
 	return e.position
+}
+
+// Resets all search cache
+func (e *Engine) NewGame() {
+	// Wait for search to end
+	for e.IsThinking() {
+	}
+	e.ttable.Clear()
 }
 
 // Set the limits
