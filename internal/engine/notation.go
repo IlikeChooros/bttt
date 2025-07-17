@@ -34,28 +34,6 @@ const _notationNumberOfSections int = 3
 //
 //	oxxxo1o2
 //
-// However, if this board is terminated, we add at the begining
-// a flag indicating it's state (see that in the example above there is no termination flag)
-//
-//	o | x | x
-//
-// ----------
-//
-//	o | x |
-//
-// ----------
-//
-//	o | x |
-//
-// Here both O and X could win, however it only counts for the side that achieved it first
-// Format of this position could be:
-//
-//	Xoxxox1ox1
-//	Ooxxox1ox1
-//
-// In the first case, the X would win on that square, and on the other one - O.
-// If there is a draw - D flag is used
-//
 // <turn> - either 'o' or 'x'
 //
 // <big index> - where should current player make move on the
@@ -74,15 +52,6 @@ func (p *Position) Notation() string {
 
 		// In each row, we will generate the small square string
 		counter := 0
-		switch p.bigPositionState[rowIndex] {
-		case PositionCircleWon:
-			builder.WriteByte('O')
-		case PositionCrossWon:
-			builder.WriteByte('X')
-		case PositionDraw:
-			builder.WriteByte('D')
-		}
-
 		for i := 0; i < 9; i++ {
 			switch rowPiece := row[i]; rowPiece {
 			case PieceCircle, PieceCross:
@@ -147,10 +116,9 @@ func (p *Position) FromNotation(notation string) error {
 }
 
 // Create from notation position
-func FromNotation(notation string) *Position {
+func FromNotation(notation string) (*Position, error) {
 	pos := NewPosition()
-	_ = _FromNotation(pos, notation) // ignore the error return value
-	return pos
+	return pos, _FromNotation(pos, notation)
 }
 
 // Assign this position (from notation string) to given position object
@@ -192,12 +160,6 @@ func _FromNotation(pos *Position, notation string) error {
 			// If that's a piece, put it on the board
 			board[bigIndex][smallIndex] = PieceFromRune(v)
 			smallIndex++
-		case 'D':
-			pos.bigPositionState[bigIndex] = PositionDraw
-		case 'O':
-			pos.bigPositionState[bigIndex] = PositionCircleWon
-		case 'X':
-			pos.bigPositionState[bigIndex] = PositionCrossWon
 		case '-':
 			pos.bigPositionState[bigIndex] = PositionUnResolved
 		case '/':
@@ -235,7 +197,7 @@ func _FromNotation(pos *Position, notation string) error {
 	// Read the big index counter
 	if v := notation[seprarationIndexes[1]+1]; v >= '0' && v <= '8' {
 		// Set NextBigIndex to given value v
-		pos.stateList.Last().move = MakeMove(0, int(v-'0'))
+		pos.nextBigIndex = PosType(v - '0')
 	} else if v != '-' {
 		return fmt.Errorf("Invalid big index %c, expected a digit 0-8", v)
 	}

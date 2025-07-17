@@ -14,8 +14,6 @@ const (
 	MateTresholdValue = -MateValue
 )
 
-var _transpTable = NewHashTable[TTEntry](1 << 21)
-
 func (e *Engine) _PrintMsg(msg string) {
 	if e.print {
 		fmt.Fprint(e.writer, msg)
@@ -38,7 +36,7 @@ func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
 	e.pv.AppendMove(rootmove)
 
 	// Go through the transposition table
-	val, ok := _transpTable.Get(e.position.hash)
+	val, ok := e.ttable.Get(e.position.hash)
 	for ; ok && depth < maxdepth && val.Bestmove != PosIllegal; depth++ {
 		// Generate legal moves and see if that's a valid move
 		if !slices.Contains(e.position.GenerateMoves().Slice(), val.Bestmove) {
@@ -47,7 +45,7 @@ func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
 
 		e.pv.AppendMove(val.Bestmove)
 		e.position.MakeMove(val.Bestmove)
-		val, ok = _transpTable.Get(e.position.hash)
+		val, ok = e.ttable.Get(e.position.hash)
 	}
 
 	// Undo the moves
@@ -141,7 +139,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 
 	oldAlpha := alpha
 	hash := e.position.hash
-	if val, ok := _transpTable.Get(hash); ok && val.Depth >= depth {
+	if val, ok := e.ttable.Get(hash); ok && val.Depth >= depth {
 		// Use the cached value
 		if val.NodeType == Exact {
 			return val.Score
@@ -220,7 +218,7 @@ func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
 		newEntry.NodeType = Exact
 	}
 
-	_transpTable.Set(hash, newEntry)
+	e.ttable.Set(hash, newEntry)
 
 	return bestvalue
 }

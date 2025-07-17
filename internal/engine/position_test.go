@@ -1,7 +1,9 @@
 package uttt
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -66,56 +68,59 @@ func TestMakeUndoStates(t *testing.T) {
 	}
 
 	for i, txtpos := range notations {
-		pos := NewPosition()
-		mvpos := NewPosition()
+		t.Run(fmt.Sprintf("SubTest-%s", strings.ReplaceAll(txtpos, "/", "|")), func(t *testing.T) {
 
-		if err := pos.FromNotation(txtpos); err != nil {
-			t.Error(err)
-		} else {
-			_ = mvpos.FromNotation(txtpos)
+			if pos, err := FromNotation(txtpos); err != nil {
+				t.Error(err)
+			} else {
+				mvpos, _ := FromNotation(txtpos)
 
-			// Make the moves
-			for j, m := range moves[i] {
-				if !mvpos.IsLegal(m) {
-					t.Errorf("Move %s (at %d index, for pos index %d) is illegal", m.String(), j, i)
-					break
+				// Make the moves
+				for j, m := range moves[i] {
+					if !mvpos.IsLegal(m) {
+						t.Errorf("Move %s (at %d index, for pos index %d) is illegal", m.String(), j, i)
+						break
+					}
+					mvpos.MakeMove(m)
 				}
-				mvpos.MakeMove(m)
-			}
 
-			// Undo the moves
-			for range moves[i] {
-				mvpos.UndoMove()
-			}
+				// Undo the moves
+				for range moves[i] {
+					mvpos.UndoMove()
+				}
 
-			// Compare the states
-			if mvpos.termination != pos.termination {
-				t.Errorf("Termination ineq got=%v, want=%v", mvpos.termination, pos.termination)
+				// Compare the states
+				if mvpos.termination != pos.termination {
+					t.Errorf("Termination ineq got=%v, want=%v", mvpos.termination, pos.termination)
+				}
+				if mvpos.hash != pos.hash {
+					t.Errorf("Hash inequality got=%d, want=%d", mvpos.hash, pos.hash)
+				}
+				if !reflect.DeepEqual(mvpos.position, pos.position) {
+					t.Errorf("Position inequality got=%v, want=%v", mvpos.position, pos.position)
+				}
+				if !reflect.DeepEqual(mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice()) {
+					t.Errorf("Legal moves ineq got=%v, want=%v", mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice())
+				}
+				if !reflect.DeepEqual(mvpos.stateList.list, pos.stateList.list) {
+					t.Errorf("Statelists ineq got=%v, want=%v", mvpos.stateList.list, pos.stateList.list)
+				}
+				if !reflect.DeepEqual(mvpos.bigPositionState, pos.bigPositionState) {
+					t.Errorf("bigPositionStates ineq got=%v, want=%d", mvpos.bigPositionState, pos.bigPositionState)
+				}
+				if mvpos.Notation() != pos.Notation() {
+					t.Errorf("Notation ineq got=%s, want=%s", mvpos.Notation(), pos.Notation())
+				}
+				if mvpos.IsTerminated() != pos.IsTerminated() {
+					t.Errorf("Termination status ineq got=%t, want=%t", mvpos.IsTerminated(), pos.IsTerminated())
+				}
+				if !reflect.DeepEqual(mvpos.bitboards, pos.bitboards) {
+					t.Errorf("Bitboards ineq got=%v, want=%v", mvpos.bitboards, pos.bitboards)
+				}
+				if mvpos.BigIndex() != pos.BigIndex() {
+					t.Errorf("BigIndex ineq got=%d, want=%d", mvpos.BigIndex(), pos.BigIndex())
+				}
 			}
-			if mvpos.hash != pos.hash {
-				t.Errorf("Hash inequality got=%d, want=%d", mvpos.hash, pos.hash)
-			}
-			if !reflect.DeepEqual(mvpos.position, pos.position) {
-				t.Errorf("Position inequality got=%v, want=%v", mvpos.position, pos.position)
-			}
-			if !reflect.DeepEqual(mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice()) {
-				t.Errorf("Legal moves ineq got=%v, want=%v", mvpos.GenerateMoves().Slice(), pos.GenerateMoves().Slice())
-			}
-			if !reflect.DeepEqual(mvpos.stateList.list, pos.stateList.list) {
-				t.Errorf("Statelists ineq got=%v, want=%v", mvpos.stateList.list, pos.stateList.list)
-			}
-			if !reflect.DeepEqual(mvpos.bigPositionState, pos.bigPositionState) {
-				t.Errorf("bigPositionStates ineq got=%v, want=%d", mvpos.bigPositionState, pos.bigPositionState)
-			}
-			if mvpos.Notation() != pos.Notation() {
-				t.Errorf("Notation ineq got=%s, want=%s", mvpos.Notation(), pos.Notation())
-			}
-			if mvpos.IsTerminated() != pos.IsTerminated() {
-				t.Errorf("Termination status ineq got=%t, want=%t", mvpos.IsTerminated(), pos.IsTerminated())
-			}
-			if !reflect.DeepEqual(mvpos.bitboards, pos.bitboards) {
-				t.Errorf("Bitboards ineq got=%v, want=%v", mvpos.bitboards, pos.bitboards)
-			}
-		}
+		})
 	}
 }

@@ -4,6 +4,7 @@ type BoardState struct {
 	move              PosType
 	turn              TurnType
 	thisPositionState PositionState
+	prevBigIndex      PosType // Mostly it will be move.SmallIndex, but if the small board terminates, it resets to PosIndexIllegal
 }
 
 // Stores the history of the position as a slice of BoardState
@@ -21,12 +22,12 @@ func NewStateList() *StateList {
 // Initialize the state list, for example after calling 'Clear'
 func (sl *StateList) Init() {
 	sl.list = make([]BoardState, 0, 10)
-	sl.Append(PosIllegal, CircleTurn, PositionUnResolved)
+	sl.Append(PosIllegal, CircleTurn, PositionUnResolved, PosIndexIllegal)
 }
 
 // Append new state
-func (sl *StateList) Append(move PosType, turn TurnType, state PositionState) {
-	sl.list = append(sl.list, BoardState{move, turn, state})
+func (sl *StateList) Append(move PosType, turn TurnType, state PositionState, prevBigIndex PosType) {
+	sl.list = append(sl.list, BoardState{move, turn, state, prevBigIndex})
 }
 
 // Reset all states (remove them)
@@ -53,9 +54,4 @@ func (sl *StateList) Last() *BoardState {
 // Get last move's Big Index
 func (sl *StateList) BigIndex() PosType {
 	return sl.Last().move.BigIndex()
-}
-
-// Same as SmallIndex
-func (sl *StateList) NextBigIndex() PosType {
-	return sl.Last().move.SmallIndex()
 }

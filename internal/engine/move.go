@@ -42,6 +42,10 @@ func (ml *MoveList) Append(bigIndex, smallIndex int) {
 
 // Convert movelist into a string, uses move notation with space seperation
 func (ml *MoveList) String() string {
+	if ml.size == 0 {
+		return "empty"
+	}
+
 	strMoves := make([]string, ml.size)
 	for i, m := range ml.Slice() {
 		strMoves[i] = m.String()

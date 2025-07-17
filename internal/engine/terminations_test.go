@@ -2,6 +2,7 @@ package uttt
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -27,10 +28,10 @@ func TestTerminatedPositions(t *testing.T) {
 		// o x o
 		"xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo o 0",
 		// x x x Impossible position: Winning position for X
-		"xxx6/xxx6/xxx6/9/9/9/9/9/9 x 0",
+		"xxx6/xxx6/xxx6/9/9/9/9/9/9 x 4",
 		// o o o Impossible position: Winning position for O
-		"ooo6/9/ooo6/9/ooo6/xoxo5/ooo6/9/ooo6 x 0",
-		// Draw, by no avaible move
+		"ooo6/9/ooo6/9/ooo6/xoxo5/ooo6/9/ooo6 x 1",
+		// IllegalPosition, by no avaible move
 		"xoxxoxoxo/9/9/9/9/9/9/9/9 x 0",
 
 		// No termination
@@ -42,13 +43,13 @@ func TestTerminatedPositions(t *testing.T) {
 		TerminationDraw,
 		TerminationCrossWon,
 		TerminationCircleWon,
-		TerminationDraw,
+		TerminationIllegalPosition,
 		TerminationNone,
 	}
 
 	pos := NewPosition()
 	for i, str := range notations {
-		t.Run(fmt.Sprintf("SubTest-%s", str), func(ts *testing.T) {
+		t.Run(fmt.Sprintf("SubTest-%s", strings.ReplaceAll(str, "/", "|")), func(ts *testing.T) {
 			// Catch invalid notation string
 			err := pos.FromNotation(str)
 			if err != nil {
@@ -70,47 +71,46 @@ func TestTerminationsByMove(t *testing.T) {
 		"xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxx1xoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo/xoxxoxoxo o 4",
 		"xxx6/xxx6/x1x6/9/9/9/9/9/9 x 2",
 		"ooo6/9/ooo6/9/ooo6/xoxo5/oo7/9/9 o 6",
-		"1oxxoxoxo/9/9/9/9/9/9/9/9 x 0",
 	}
 
 	moves := [][]PosType{
 		{MakeMove(4, 4)},
 		{MakeMove(2, 1)},
 		{MakeMove(6, 2)},
-		{MakeMove(0, 0)},
 	}
 
 	states := []Termination{
 		TerminationDraw,
 		TerminationCrossWon,
 		TerminationCircleWon,
-		TerminationDraw,
 	}
-
-	pos := NewPosition()
 	for i, position := range positions {
 
 		// Run these as subtests
-		t.Run(fmt.Sprintf("Subtest:%s", position), func(t *testing.T) {
-			err := pos.FromNotation(position)
+		t.Run(fmt.Sprintf("SubTest-%s", strings.ReplaceAll(position, "/", "|")), func(t *testing.T) {
+			pos, err := FromNotation(position)
 
 			if err != nil {
 				t.Error(err)
-			} else {
-				// Positions shouldn't be terminated
-				if pos.IsTerminated() {
-					t.Error("Position is terminated: ", pos.Notation())
-				}
+				return
+			}
 
-				// Make the moves
-				for _, m := range moves[i] {
-					pos.MakeMove(m)
-				}
+			// Positions shouldn't be terminated
+			if pos.IsTerminated() {
+				t.Error("Position is terminated: ", pos.Notation())
+			}
 
-				// Check if the terminations match
-				if !pos.IsTerminated() || states[i] != pos.termination {
-					t.Errorf("Termination state doesn't match, got=%v, want=%v", pos.termination, states[i])
+			// Make the moves
+			for _, m := range moves[i] {
+				if err := pos.MakeLegalMove(m); err != nil {
+					t.Error(err)
+					return
 				}
+			}
+
+			// Check if the terminations match
+			if !pos.IsTerminated() || states[i] != pos.termination {
+				t.Errorf("Termination state doesn't match, got=%v, want=%v", pos.termination, states[i])
 			}
 		})
 	}

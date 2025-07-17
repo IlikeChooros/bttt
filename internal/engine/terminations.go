@@ -3,11 +3,12 @@ package uttt
 type Termination int
 
 const (
-	TerminationNone      Termination = 0
-	TerminationCircleWon Termination = 1
-	TerminationCrossWon  Termination = 2
-	TerminationDraw      Termination = 4
-	TerminationResigned  Termination = 8
+	TerminationNone            Termination = 0
+	TerminationCircleWon       Termination = 1
+	TerminationCrossWon        Termination = 2
+	TerminationDraw            Termination = 4
+	TerminationResigned        Termination = 8
+	TerminationIllegalPosition Termination = 16
 )
 
 var _patterns = [8][3]int{
@@ -69,16 +70,7 @@ func _checkSquareTermination(crossbb, circlebb uint) PositionState {
 
 func (pos *Position) CheckTerminationPattern() {
 	// Check if we are in a terminated state of the board
-	// Assuming we correctly updated 'bigPositionState'
-
-	// Check first draw condition:
-	// If our current BigIndex board,
-	// Is fully filled, thus no move is possible
-	if bi := int(pos.BigIndex()); bi != int(PosIndexIllegal) &&
-		((pos.bitboards[0][bi] | pos.bitboards[1][bi]) == 0b111111111) {
-		pos.termination = TerminationDraw
-		return
-	}
+	// Assuming we correctly updated 'bigPositionState' (with the _checkSquareTermination)
 
 	// Check winning conditions for all patterns
 	for _, pattern := range _patterns {
@@ -104,7 +96,14 @@ func (pos *Position) CheckTerminationPattern() {
 	if is_draw {
 		pos.termination = TerminationDraw
 	} else {
-		// This is neither a draw or a win, so there is no termination
-		pos.termination = TerminationNone
+		// If our current BigIndex board is terminated, this means we got a
+		// setup board position and the user incorrecly set the BigIndex, thus there is no
+		// possible move to make
+		if bi := pos.BigIndex(); bi != PosIndexIllegal && pos.bigPositionState[bi] != PositionUnResolved {
+			pos.termination = TerminationIllegalPosition
+		} else {
+			// This is neither a draw or a win, so there is no termination
+			pos.termination = TerminationNone
+		}
 	}
 }

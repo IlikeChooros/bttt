@@ -12,7 +12,12 @@ func (pos *Position) GenerateMoves() *MoveList {
 	// If there is no history, we can choose also the 'Big Index' position
 	if pos.BigIndex() == PosIndexIllegal {
 		for bigIndex := range 9 {
-			free = 0b111111111 ^ pos.bitboards[0][bigIndex] ^ pos.bitboards[1][bigIndex]
+			if pos.bigPositionState[bigIndex] != PositionUnResolved {
+				continue
+			}
+
+			// This is valid, because these 2 bitboards are mutally exclusive
+			free = 0b111111111 ^ (pos.bitboards[0][bigIndex] | pos.bitboards[1][bigIndex])
 			for free != 0 {
 				movelist.Append(bigIndex, bits.TrailingZeros(free))
 				free &= free - 1
@@ -21,7 +26,11 @@ func (pos *Position) GenerateMoves() *MoveList {
 	} else {
 		// Else we generate moves for the 'Big Index' position
 		bi := pos.BigIndex()
-		free = 0b111111111 ^ pos.bitboards[0][bi] ^ pos.bitboards[1][bi]
+		if pos.bigPositionState[bi] != PositionUnResolved {
+			return movelist
+		}
+
+		free = 0b111111111 ^ (pos.bitboards[0][bi] | pos.bitboards[1][bi])
 		for free != 0 {
 			movelist.Append(int(bi), bits.TrailingZeros(free))
 			free &= free - 1

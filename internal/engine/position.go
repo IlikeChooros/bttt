@@ -1,5 +1,7 @@
 package uttt
 
+import "fmt"
+
 // Constants
 
 const (
@@ -12,6 +14,7 @@ type Position struct {
 	bitboards        [2][9]uint
 	bigPositionState [9]PositionState // Array of uint8's, where each one means, either cross, circle or no one won on that square
 	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
+	nextBigIndex     PosType
 	termination      Termination
 	hash             uint64 // Current hash of the position
 }
@@ -20,13 +23,14 @@ type Position struct {
 func NewPosition() *Position {
 	pos := &Position{}
 	pos.Init()
-	pos.hash = pos.Hash()
 	return pos
 }
 
 // Initialize the position
-func (b *Position) Init() {
-	b.stateList = NewStateList()
+func (p *Position) Init() {
+	p.stateList = NewStateList()
+	p.hash = p.Hash()
+	p.nextBigIndex = PosIndexIllegal
 }
 
 func (p *Position) Reset() {
@@ -95,17 +99,18 @@ func (b *Position) Turn() TurnType {
 }
 
 func (p *Position) BigIndex() PosType {
-	return p.stateList.NextBigIndex()
+	return p.nextBigIndex
 }
 
 func (p *Position) _UpdateBigPosHash(state PositionState, bigIndex PosType) {
 	// Update the hash
 	idx := -1
-	if state == PositionCrossWon {
+	switch state {
+	case PositionCrossWon:
 		idx = 1
-	} else if state == PositionCircleWon {
+	case PositionCircleWon:
 		idx = 0
-	} else if state == PositionDraw {
+	case PositionDraw:
 		idx = 2
 	}
 
@@ -114,15 +119,25 @@ func (p *Position) _UpdateBigPosHash(state PositionState, bigIndex PosType) {
 	}
 }
 
+// Verifies legality of given move, then if it's valid, make's it on the board
+func (p *Position) MakeLegalMove(move PosType) error {
+	if !p.IsLegal(move) {
+		return fmt.Errorf("Move %s is illegal, possible moves=[%s]", move.String(), p.GenerateMoves().String())
+	}
+	p.MakeMove(move)
+	return nil
+}
+
 // Make a move on the position, switches the sides, and puts current piece
 // on the position [bigIndex][smallIndex], accepts any move
 func (p *Position) MakeMove(move PosType) {
-	if p.termination != TerminationNone {
+	// UPDATE: Apparently we can't make a move inside a terminated position
+	bigIndex := move.BigIndex()
+	if p.termination != TerminationNone || p.bigPositionState[bigIndex] != PositionUnResolved {
 		return
 	}
 
 	smallIndex := move.SmallIndex()
-	bigIndex := move.BigIndex()
 
 	// Make sure the coordinates are correct
 	if smallIndex > 8 || bigIndex > 8 {
@@ -131,41 +146,52 @@ func (p *Position) MakeMove(move PosType) {
 
 	// Choose the piece, based on the current side to move
 	piece := PieceCircle
-	lastState := p.stateList.Last()
-	posStateBefore := p.bigPositionState[bigIndex]
-	index := _boolToInt(bool(p.Turn()))
 
-	// Meaning last turn, cross made a move, so now it's circle's turn
+	// Now it's Cross's turn
 	if p.Turn() == CrossTurn {
 		piece = PieceCross
 	}
+
+	posStateBefore := p.bigPositionState[bigIndex]
+	index := _boolToInt(bool(p.Turn()))
+	nextBigIndex := smallIndex
 
 	// Put that piece on the position
 	p.position[bigIndex][smallIndex] = piece
 	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
+	// Update Big board state, by checking if the smaller board, we are making move on,
+	// is terminated
+	p.bigPositionState[bigIndex] = _checkSquareTermination(
+		p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
+	)
+
+	// If our move terminates the position AND opponent's move would be on the same board
+	// next move has to be played on any other non-terminated board
+	if p.bigPositionState[bigIndex] != PositionUnResolved && bigIndex == nextBigIndex {
+		nextBigIndex = PosIndexIllegal
+	}
+
 	// Update hash
 	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
 	p.hash ^= _hashTurn
+
 	// Remove previous big index hash
-	if p.BigIndex() != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[p.BigIndex()]
+	if p.nextBigIndex != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[p.nextBigIndex]
 	}
+
 	// Set new 'big index'
-	p.hash ^= _hashBigIndex[smallIndex]
-
-	// Update Big board state
-	if p.bigPositionState[bigIndex] == PositionUnResolved {
-		p.bigPositionState[bigIndex] = _checkSquareTermination(
-			p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
-		)
-
-		// Update the big position state hash hash
-		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
+	if nextBigIndex != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[nextBigIndex]
 	}
+
+	// Update the big position state hash
+	p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 
 	// Append new state
-	p.stateList.Append(move, !lastState.turn, posStateBefore)
+	p.stateList.Append(move, !p.stateList.Last().turn, posStateBefore, p.nextBigIndex)
+	p.nextBigIndex = nextBigIndex // update nextBigIndex
 }
 
 // Undo last move, from the state list
@@ -184,12 +210,16 @@ func (p *Position) UndoMove() {
 	p.position[bigIndex][smallIndex] = PieceNone
 	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
-	// Remove piece's, turn's and bigPositionState's hash
+	// Remove piece, turn and bigIndex hash
 	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
 	p.hash ^= _hashTurn
-	p.hash ^= _hashBigIndex[p.BigIndex()]
+
+	if p.nextBigIndex != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[p.nextBigIndex]
+	}
 
 	// If this move had changed the big position state, update the hash
+	// (last move terminated that tic tac toe board, so we should undo the state hash)
 	if lastState.thisPositionState != p.bigPositionState[bigIndex] {
 		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 	}
@@ -201,11 +231,12 @@ func (p *Position) UndoMove() {
 	p.termination = TerminationNone
 
 	// Restore current state
+	p.nextBigIndex = lastState.prevBigIndex
 	p.stateList.Remove()
 
 	// Add previous big index hash
-	if bi := p.BigIndex(); bi != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[bi]
+	if p.nextBigIndex != PosIndexIllegal {
+		p.hash ^= _hashBigIndex[p.nextBigIndex]
 	}
 }
 
@@ -222,8 +253,11 @@ func (p *Position) IsLegal(move PosType) bool {
 		return false
 	}
 
-	// Index out of range or this square is occupied
-	if bi >= 9 || si >= 9 || p.position[bi][si] != PieceNone {
+	// Index out of range, board terminated, non-empty square or tic tac toe board is terminated
+	if bi >= 9 || si >= 9 ||
+		p.termination != TerminationNone ||
+		p.position[bi][si] != PieceNone ||
+		p.bigPositionState[bi] != PositionUnResolved {
 		return false
 	}
 

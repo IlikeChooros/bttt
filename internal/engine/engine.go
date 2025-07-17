@@ -4,6 +4,7 @@ import (
 	"io"
 	"os"
 	"sync/atomic"
+	"unsafe"
 )
 
 /*
@@ -14,6 +15,7 @@ type Engine struct {
 	position *Position
 	limits   *Limits
 	timer    *_Timer
+	ttable   *HashTable[TTEntry]
 	result   SearchResult
 	stop     atomic.Bool
 	print    bool
@@ -35,6 +37,7 @@ func NewEngine() *Engine {
 	e.timer = _NewTimer()
 	e.pv = NewMoveList()
 	e.writer = os.Stdout
+	e.ttable = NewHashTable[TTEntry](16 * (1 << 20) / uint64(unsafe.Sizeof(TTEntry{})))
 	return e
 }
 

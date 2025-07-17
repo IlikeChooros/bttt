@@ -2,6 +2,7 @@ package uttt
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 )
 
@@ -13,7 +14,10 @@ func HelperTestReversingMoves(
 	// Make the moves
 	nmoves := len(moves)
 	for _, m := range moves {
-		pos.MakeMove(m)
+		err := pos.MakeLegalMove(m)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Undo them
@@ -64,7 +68,7 @@ func TestMakeUndoMoves(t *testing.T) {
 	// Go through all other moves, also starting position, but
 	// initialized with .FromNotation
 	for i, strpos := range notations {
-		t.Run(fmt.Sprintf("%d::%s", i, strpos), func(test *testing.T) {
+		t.Run(fmt.Sprintf("SubTest-%d-%s", i, strings.ReplaceAll(strpos, "/", "|")), func(test *testing.T) {
 
 			err := pos.FromNotation(strpos)
 
@@ -100,6 +104,7 @@ func TestPerft(t *testing.T) {
 				"Invalid Perft nodes (depth=%d), got=%d, want=%d",
 				i+1, nodes, n,
 			)
+			break
 		}
 	}
 }
