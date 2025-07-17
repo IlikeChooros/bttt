@@ -1,19 +1,16 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 	uttt "uttt/internal/engine"
 	"uttt/internal/server"
-	"uttt/internal/utils"
 
 	"github.com/gorilla/mux"
-	"github.com/joho/godotenv"
 )
 
 var workerPool *server.WorkerPool
@@ -21,35 +18,43 @@ var workerPool *server.WorkerPool
 func main() {
 	// Initialize the ultimate tic tac toe lib
 	uttt.Init()
-
-	// Load .env file (if exists)
-	err := godotenv.Load(".env")
-	if err != nil {
-		log.Println("Failed to load .env file, using the default settings.")
-	}
+	server.LoadConfig()
 
 	// Set the parameters for worker pool
-	workers := utils.GetEnvInt("WORKERS", 4)
-	queueSize := utils.GetEnvInt("QUEUE_SIZE", 100)
-	port := utils.GetEnv("PORT", "8080")
+	log.Printf("Starting the worker pool: workers=%d, queueSize=%d\n",
+		server.DefaultConfig.Pool.DefaultWorkers,
+		server.DefaultConfig.Pool.DefaultQueueSize)
 
-	log.Printf("Starting the worker pool: workers=%d, queueSize=%d\n", workers, queueSize)
+	ctx := context.Background()
+	workerPool = server.NewWorkerPool(
+		server.DefaultConfig.Pool.DefaultWorkers,
+		server.DefaultConfig.Pool.DefaultQueueSize)
+	workerPool.Start(ctx)
 
-	workerPool = server.NewWorkerPool(workers, queueSize)
-	workerPool.Start()
+	// Create new logger
+	logger := server.NewLogger()
 
 	// Create new router
-	server.SetupCors()
 	router := mux.NewRouter()
+	router.Use(server.TracingMiddleware())
+	router.Use(server.LoggingMiddleware(logger))
+	router.Use(server.MetricsMiddleware)
 	router.Use(server.CorsMiddleware)
-	router.HandleFunc("/analysis", handleAnalysis)
+
+	// API endpoints
+	router.HandleFunc("/analysis", server.AnalysisHandler(workerPool))
+	router.HandleFunc("/health", server.HealthHandler(workerPool))
+	router.HandleFunc("/metrics", server.MetricsHandler())
 
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: router,
+		Addr:         ":" + server.DefaultConfig.Server.Port,
+		Handler:      router,
+		ReadTimeout:  server.DefaultConfig.Server.ReadTimeout,
+		WriteTimeout: server.DefaultConfig.Server.WriteTimeout,
 	}
 
 	// Graceful shutdown, closes all remaning jobs on Ctrl+C
+	done := make(chan bool, 1)
 	go func() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
@@ -57,36 +62,22 @@ func main() {
 
 		log.Println("Shutting down server...")
 		workerPool.Stop()
-		_ = srv.Shutdown(workerPool.Context())
+		ctx, cancel := context.WithTimeout(ctx, server.DefaultConfig.Server.ShutdownTimeout)
+
+		defer cancel()
+
+		srv.SetKeepAlivesEnabled(false)
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Println("Couldn't shutdown server gracefully...")
+		}
+		close(done)
 	}()
 
-	log.Printf("Listening on: http://localhost:%s\n", port)
-	log.Fatal(srv.ListenAndServe())
-}
-
-func handleAnalysis(w http.ResponseWriter, r *http.Request) {
-	var req server.AnalysisRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "Invalid JSON", http.StatusBadRequest)
-		return
+	log.Printf("Listening on: http://localhost:%s\n", server.DefaultConfig.Server.Port)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
 	}
 
-	req.Response = make(chan server.AnalysisResponse, 1)
-
-	// Try submitting the request
-	if !workerPool.Submit(req) {
-		http.Error(w, "Server is too busy", http.StatusServiceUnavailable)
-		return
-	}
-
-	// Now wait for the analysis
-	timeout := time.NewTimer(30 * time.Second)
-	select {
-	case resp := <-req.Response:
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	case <-timeout.C:
-		http.Error(w, "Analysis timeout", http.StatusRequestTimeout)
-	}
+	<-done
+	log.Println("Server stopped")
 }

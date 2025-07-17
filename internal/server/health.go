@@ -33,7 +33,7 @@ type MemoryStats struct {
 
 var startTime = time.Now()
 
-func (wp *WorkerPool) HealthHandler(version string) http.HandlerFunc {
+func HealthHandler(wp *WorkerPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var m runtime.MemStats
 		runtime.GC()
@@ -46,9 +46,9 @@ func (wp *WorkerPool) HealthHandler(version string) http.HandlerFunc {
 			WorkerPool: WorkerPoolStatus{
 				ActiveWorkers: wp.workers,
 				QueueCapacity: cap(wp.jobQueue),
-				ActiveJobs:    0,
-				PendingJobs:   0,
-				RefusedJobs:   0,
+				ActiveJobs:    int(wp.ActiveJobs()),
+				PendingJobs:   int(wp.PendingJobs()),
+				RefusedJobs:   int(wp.RefusedJobs()),
 			},
 			Memory: MemoryStats{
 				AllocMb:      bytesToMB(m.Alloc),

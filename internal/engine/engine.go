@@ -30,7 +30,7 @@ func Init() {
 }
 
 // Get new engine instance
-func NewEngine() *Engine {
+func NewEngine(ttsize int) *Engine {
 	e := new(Engine)
 	e.position = NewPosition()
 	e.limits = DefaultLimits()
@@ -38,7 +38,7 @@ func NewEngine() *Engine {
 	e.timer = _NewTimer()
 	e.pv = NewMoveList()
 	e.writer = os.Stdout
-	e.ttable = NewHashTable[TTEntry](16 * (1 << 20) / uint64(unsafe.Sizeof(TTEntry{})))
+	e.ttable = NewHashTable[TTEntry](uint64(ttsize) * (1 << 20) / uint64(unsafe.Sizeof(TTEntry{})))
 	return e
 }
 

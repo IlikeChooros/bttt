@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -17,8 +18,9 @@ type Metrics struct {
 	AnalysisAvgDuration   int64 // in ms
 }
 
-var ServerMetrics = &Metrics{}
+var ServerMetrics = Metrics{}
 
+// Returns server metrics middleware, increments stats each time new request comes
 func MetricsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
@@ -30,8 +32,28 @@ func MetricsMiddleware(next http.Handler) http.Handler {
 		})
 }
 
+// handles /metrics endpoint
+func MetricsHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		defer ServerMetrics.AnalysisDurationMutex.Unlock()
+
+		ServerMetrics.AnalysisDurationMutex.Lock()
+		metrics := map[string]any{
+			"requests_total":    ServerMetrics.RequestsTotal.Load(),
+			"requests_active":   ServerMetrics.RequestsActive.Load(),
+			"analysis_total":    ServerMetrics.AnalysisTotal.Load(),
+			"analysis_errors":   ServerMetrics.AnalysisErrors.Load(),
+			"analysis_avg_time": ServerMetrics.AnalysisAvgDuration,
+		}
+
+		_ = json.NewEncoder(w).Encode(metrics)
+	}
+}
+
 func (wp *WorkerPool) processJobWithMetrics(engine *uttt.Engine, req AnalysisRequest) {
 	start := time.Now()
+
 	// Update average duration
 	defer func() {
 		duration := time.Since(start).Milliseconds()
@@ -42,6 +64,7 @@ func (wp *WorkerPool) processJobWithMetrics(engine *uttt.Engine, req AnalysisReq
 				int64(ServerMetrics.AnalysisTotal.Load())
 		ServerMetrics.AnalysisDurationMutex.Unlock()
 	}()
+
 	// Close this channel
 	defer close(req.Response)
 

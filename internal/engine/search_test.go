@@ -18,7 +18,7 @@ func TestMates(t *testing.T) {
 		2,
 	}
 
-	engine := NewEngine()
+	engine := NewEngine(16)
 	engine.SetLimits(*DefaultLimits().SetDepth(6))
 
 	for i, pos := range positions {

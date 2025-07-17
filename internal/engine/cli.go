@@ -16,7 +16,7 @@ type Cli struct {
 // Get new cli object (pointer)
 func NewCli() *Cli {
 	cli := new(Cli)
-	cli.engine = NewEngine()
+	cli.engine = NewEngine(16)
 	return cli
 }
 

@@ -6,7 +6,7 @@ import (
 
 func main() {
 	// uttt.OptimizeHash(40, 120)
-	// e := uttt.NewEngine()
+	// e := uttt.NewEngine(16)
 	// e.SetLimits(*uttt.DefaultLimits().SetDepth(10))
 	// e.Think(true)
 	cli := uttt.NewCli()
