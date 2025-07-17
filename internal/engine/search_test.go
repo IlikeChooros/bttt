@@ -9,7 +9,7 @@ func TestMates(t *testing.T) {
 	// mates (at depth > 1)
 
 	positions := []string{
-		"Xxxx6/x1x6/Xxxx6/Oo3o3o/x1xoxooxo/Oo3o3o/Oooo6/9/9 o 4",
+		"xxx6/x1x6/xxx6/o3o3o/x1xoxooxo/o3o3o/ooo6/9/9 o 4",
 	}
 
 	// Positive means winning for the X, negative - O

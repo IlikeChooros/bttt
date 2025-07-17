@@ -125,9 +125,9 @@ func FromNotation(notation string) (*Position, error) {
 func _FromNotation(pos *Position, notation string) error {
 	// TODO: make this more robust
 	board := &pos.position
-
 	bigIndex := 0
 	smallIndex := 0
+	pos.termination = TerminationIllegalPosition
 
 	// Assert we have a valid structure
 	const numSlash = 8

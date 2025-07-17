@@ -43,7 +43,7 @@ func TestTerminatedPositions(t *testing.T) {
 		TerminationDraw,
 		TerminationCrossWon,
 		TerminationCircleWon,
-		TerminationIllegalPosition,
+		TerminationNone,
 		TerminationNone,
 	}
 

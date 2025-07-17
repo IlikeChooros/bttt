@@ -37,6 +37,7 @@ func (p *Position) Reset() {
 	p.stateList.Clear()
 	p.termination = TerminationNone
 	p.hash = 0
+	p.nextBigIndex = PosIndexIllegal
 
 	// Zero the board
 	for i := range p.position {
@@ -86,6 +87,12 @@ func (pos *Position) SetupBoardState() {
 			)
 		}
 	}
+	// Don't allow playing on terminated ttt board
+	if pos.nextBigIndex != PosIndexIllegal &&
+		pos.bigPositionState[pos.nextBigIndex] != PositionUnResolved {
+		pos.nextBigIndex = PosIndexIllegal
+	}
+
 	pos.hash = pos.Hash()
 }
 
@@ -133,7 +140,7 @@ func (p *Position) MakeLegalMove(move PosType) error {
 func (p *Position) MakeMove(move PosType) {
 	// UPDATE: Apparently we can't make a move inside a terminated position
 	bigIndex := move.BigIndex()
-	if p.termination != TerminationNone || p.bigPositionState[bigIndex] != PositionUnResolved {
+	if p.termination != TerminationNone {
 		return
 	}
 
@@ -166,9 +173,9 @@ func (p *Position) MakeMove(move PosType) {
 		p.bitboards[1][bigIndex], p.bitboards[0][bigIndex],
 	)
 
-	// If our move terminates the position AND opponent's move would be on the same board
-	// next move has to be played on any other non-terminated board
-	if p.bigPositionState[bigIndex] != PositionUnResolved && bigIndex == nextBigIndex {
+	// If opponent's move would be on terminated tic tac toe board,
+	// allow every it to play on every board
+	if p.bigPositionState[nextBigIndex] != PositionUnResolved {
 		nextBigIndex = PosIndexIllegal
 	}
 
