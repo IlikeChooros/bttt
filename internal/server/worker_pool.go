@@ -4,10 +4,12 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 	uttt "uttt/internal/engine"
 )
 
 type AnalysisResponse struct {
+	Depth int      `json:"depth"`
 	Pv    []string `json:"pv"`
 	Nps   uint64   `json:"nps"`
 	Eval  string   `json:"eval"`
@@ -101,6 +103,16 @@ func (wp *WorkerPool) worker(ctx context.Context) {
 	}
 }
 
+// A simple timeout funciton, call engine.Stop() after MaxMovetime elapses, else does nothing
+func searchTimeout(done chan bool, engine *uttt.Engine) {
+	select {
+	case <-done:
+		return
+	case <-time.After(time.Duration(DefaultConfig.Engine.MaxMovetime) * time.Millisecond):
+		engine.Stop()
+	}
+}
+
 // Handle engine search
 func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) AnalysisResponse {
 	// Decrement the counter
@@ -136,9 +148,14 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 		limits.SetDepth(min(req.Depth, DefaultConfig.Engine.MaxDepth))
 	}
 
+	// Use here a timeout
+	searchFinished := make(chan bool)
+	go searchTimeout(searchFinished, engine)
+
 	// Search, and return the result
 	engine.SetLimits(limits)
 	result := engine.Think(false)
+	close(searchFinished)
 
 	// Create the pv string slice
 	pv := make([]string, engine.Pv().Size())
@@ -149,8 +166,9 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 
 	// Set the response object
 	return AnalysisResponse{
-		Pv:   pv,
-		Nps:  result.Nps,
-		Eval: result.String(),
+		Depth: result.Depth,
+		Pv:    pv,
+		Nps:   result.Nps,
+		Eval:  result.String(),
 	}
 }

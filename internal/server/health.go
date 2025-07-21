@@ -4,24 +4,25 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
+	"sync/atomic"
 	"time"
 )
 
 // Health status endpoint, shows memory used, worker pool status
-type HealthStatus struct {
-	Status     string           `json:"status"`
-	TimeStanp  time.Time        `json:"time_stamp"`
-	Uptime     string           `json:"uptime"`
-	WorkerPool WorkerPoolStatus `json:"worker_pool"`
-	Memory     MemoryStats      `json:"memory"`
+type HealthStats struct {
+	Status     string          `json:"status"`
+	TimeStanp  time.Time       `json:"time_stamp"`
+	Uptime     string          `json:"uptime"`
+	WorkerPool WorkerPoolStats `json:"worker_pool"`
+	Memory     MemoryStats     `json:"memory"`
 }
 
-type WorkerPoolStatus struct {
-	ActiveWorkers int `json:"active_workers"`
-	QueueCapacity int `json:"queue_capacity"`
-	ActiveJobs    int `json:"acitve_jobs"`
-	PendingJobs   int `json:"pending_jobs"`
-	RefusedJobs   int `json:"refused_jobs"`
+type WorkerPoolStats struct {
+	ActiveWorkers int   `json:"active_workers"`
+	QueueCapacity int   `json:"queue_capacity"`
+	ActiveJobs    int64 `json:"acitve_jobs"`
+	PendingJobs   int64 `json:"pending_jobs"`
+	RefusedJobs   int64 `json:"refused_jobs"`
 }
 
 type MemoryStats struct {
@@ -32,6 +33,23 @@ type MemoryStats struct {
 }
 
 var startTime = time.Now()
+var ServerStatus atomic.Uint32
+
+const (
+	ServerStatusOK = iota
+	ServerStatusShuttingDown
+)
+
+func HealthzHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if ServerStatus.Load() == ServerStatusShuttingDown {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
 
 func HealthHandler(wp *WorkerPool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -39,16 +57,16 @@ func HealthHandler(wp *WorkerPool) http.HandlerFunc {
 		runtime.GC()
 		runtime.ReadMemStats(&m)
 
-		health := HealthStatus{
+		health := HealthStats{
 			Status:    "healthy",
 			TimeStanp: time.Now(),
 			Uptime:    time.Since(startTime).String(),
-			WorkerPool: WorkerPoolStatus{
+			WorkerPool: WorkerPoolStats{
 				ActiveWorkers: wp.workers,
 				QueueCapacity: cap(wp.jobQueue),
-				ActiveJobs:    int(wp.ActiveJobs()),
-				PendingJobs:   int(wp.PendingJobs()),
-				RefusedJobs:   int(wp.RefusedJobs()),
+				ActiveJobs:    wp.ActiveJobs(),
+				PendingJobs:   wp.PendingJobs(),
+				RefusedJobs:   wp.RefusedJobs(),
 			},
 			Memory: MemoryStats{
 				AllocMb:      bytesToMB(m.Alloc),

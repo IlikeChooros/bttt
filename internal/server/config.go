@@ -1,7 +1,7 @@
 package server
 
 import (
-	"log"
+	"fmt"
 	"time"
 	uttt "uttt/internal/engine"
 	"uttt/internal/utils"
@@ -35,7 +35,7 @@ type PoolConfig struct {
 type EngineConfig struct {
 	DefaultLimits *uttt.Limits // Default limits struct for the engine
 	MaxDepth      int
-	MaxMovetime   int // In miliseconds (10000 ms by default)
+	MaxMovetime   int // In milliseconds (10000 ms by default)
 }
 
 // Default configs
@@ -46,7 +46,7 @@ func LoadConfig() {
 	// Load .env file (if exists)
 	err := godotenv.Load(".env")
 	if err != nil {
-		log.Println("Failed to load .env file, using the default settings.")
+		fmt.Println("Failed to load .env file, using the default settings.")
 	}
 
 	DefaultConfig = Config{

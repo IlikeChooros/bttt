@@ -1,28 +1,29 @@
 package server
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 )
 
-// Get new logger instance, prints to standard output with http: prefix,
-// current date and time
-func NewLogger() *log.Logger {
-	return log.New(os.Stdout, "http:", log.LstdFlags)
+func NewLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(os.Stdout, nil))
 }
 
-func LoggingMiddleware(logger *log.Logger) func(http.Handler) http.Handler {
+func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			defer func() {
-				requestId, ok := r.Context().Value(RequestIDKey).(string)
+				// requestId, ok := r.Context().Value(RequestIDKey).(string)
+				// if !ok {
+				// 	requestId = "unknown"
+				// }
 
-				if !ok {
-					requestId = "unknown"
-				}
-
-				logger.Println(requestId, r.Method, r.URL.Path, r.RemoteAddr, r.UserAgent())
+				// Standard log
+				logger.Info(
+					r.UserAgent(), r.Method, r.URL.Path,
+					r.RemoteAddr, GetRequestIPAddress(r),
+				)
 			}()
 
 			next.ServeHTTP(w, r)

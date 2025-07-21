@@ -29,6 +29,7 @@ type SearchResult struct {
 	Bestmove  PosType
 	Nodes     uint64
 	Nps       uint64
+	Depth     int
 }
 
 // Set the score value, will set the according type of the score

@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,19 +20,21 @@ func main() {
 	uttt.Init()
 	server.LoadConfig()
 
+	// Create new logger
+	logger := server.NewLogger()
+
 	// Set the parameters for worker pool
-	log.Printf("Starting the worker pool: workers=%d, queueSize=%d\n",
+	logger.Info(fmt.Sprintf(
+		"Starting the worker pool: workers=%d, queueSize=%d",
 		server.DefaultConfig.Pool.DefaultWorkers,
-		server.DefaultConfig.Pool.DefaultQueueSize)
+		server.DefaultConfig.Pool.DefaultQueueSize,
+	))
 
 	ctx := context.Background()
 	workerPool = server.NewWorkerPool(
 		server.DefaultConfig.Pool.DefaultWorkers,
 		server.DefaultConfig.Pool.DefaultQueueSize)
 	workerPool.Start(ctx)
-
-	// Create new logger
-	logger := server.NewLogger()
 
 	// Create new router
 	router := mux.NewRouter()
@@ -43,8 +45,9 @@ func main() {
 
 	// API endpoints
 	router.HandleFunc("/analysis", server.AnalysisHandler(workerPool))
-	router.HandleFunc("/health", server.HealthHandler(workerPool))
-	router.HandleFunc("/metrics", server.MetricsHandler())
+	router.HandleFunc("/health", server.HealthHandler(workerPool)) // more in-depth health of the server
+	router.HandleFunc("/healthz", server.HealthzHandler())         // either 204 or 503 response
+	router.HandleFunc("/metrics", server.MetricsHandler())         // memory usage, pool usage and other stats
 
 	srv := &http.Server{
 		Addr:         ":" + server.DefaultConfig.Server.Port,
@@ -54,13 +57,13 @@ func main() {
 	}
 
 	// Graceful shutdown, closes all remaning jobs on Ctrl+C
-	done := make(chan bool, 1)
+	done := make(chan bool)
 	go func() {
 		sigint := make(chan os.Signal, 1)
 		signal.Notify(sigint, os.Interrupt, syscall.SIGTERM)
 		<-sigint
 
-		log.Println("Shutting down server...")
+		logger.Info("Shutting down server...")
 		workerPool.Stop()
 		ctx, cancel := context.WithTimeout(ctx, server.DefaultConfig.Server.ShutdownTimeout)
 
@@ -68,16 +71,24 @@ func main() {
 
 		srv.SetKeepAlivesEnabled(false)
 		if err := srv.Shutdown(ctx); err != nil {
-			log.Println("Couldn't shutdown server gracefully...")
+			logger.Error("Couldn't shutdown server gracefully...")
 		}
 		close(done)
 	}()
 
-	log.Printf("Listening on: http://localhost:%s\n", server.DefaultConfig.Server.Port)
+	ipAddress := server.GetOutboundIP()
+	hostname := "localhost"
+	if ipAddress != nil {
+		hostname = ipAddress.String()
+	}
+
+	logger.Info(fmt.Sprintf(
+		"Listening on: http://%s:%s", hostname, server.DefaultConfig.Server.Port,
+	))
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		log.Fatal(err)
+		logger.Error(err.Error())
 	}
 
 	<-done
-	log.Println("Server stopped")
+	logger.Info("Server stopped")
 }

@@ -1,4 +1,6 @@
 Big Tic Tac Toe in Go:
+# Engine
+
 ## TESTS
   - [x] Add tests for terminations (win, draw, resign)
   - [x] Add some evaluation tests (in a clearly winning position, in a clearly losing position, etc.)
@@ -108,3 +110,24 @@ I have tried:
 ```
 
 
+# Server
+
+TODO:
+- [x] Read about `context` package, and how to use it with the server
+- [x] Add actual timeout logic:
+  - Maybe try using `context` package, or implement a use simply a slice with the engine structs, and then use engine.Stop() after timeout.
+  - Simply used a async function that waits for the timeout, and then calls engine.Stop()
+- [ ] Add prometheus metrics (whatever it is)
+  - Read about docker, basic usage, and how to use it with the server,
+  - Use later in the project, right now it is not needed
+- [ ] Add rate limiting
+- [x] Make frontend for backend proxy in Next.js app
+  
+Suggested by AI:
+- Docker containerization with multi-stage builds for cleaner deployment.
+- Environment variable configuration for flexibility in different environments.
+- Circut breaker pattern to handle engine failures gracefully.
+- TLS/HTTPS support for secure communication.
+- Database pooling for efficient resource management.
+- Load testing with tools like `hey` or `wrk` to ensure the server can handle high traffic.
+- API versioning to manage changes without breaking existing clients.
