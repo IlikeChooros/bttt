@@ -2,22 +2,30 @@ package uttt
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync/atomic"
+	"unsafe"
 )
 
 // Generalized Monte-Carlo Tree Search algorithm
+
+const (
+	virtualLoss = 10
+)
 
 // Result of the rollout, either -1 (loss), 0 (draw), or 1 (win)
 type Result int
 
 // Will be called, when we choose this node, as it is the most promising to expand
-type SelectionPolicy[T comparable] func(parent, root *NodeBase[T]) *NodeBase[T]
+// Warning: when using NodeStats fields, must use atomic operations (Load, Store)
+// since the search may be multi-threaded (tree parallelized)
+type SelectionPolicy[T comparable] func(parent *NodeBase[T]) *NodeBase[T]
 
 type NodeStats struct {
-	Visits int
-	Wins   Result
-	Losses Result
+	Visits int32
+	Wins   int32
+	Losses int32
 }
 
 type NodeBase[T comparable] struct {
@@ -27,11 +35,12 @@ type NodeBase[T comparable] struct {
 	Children []NodeBase[T]
 	Parent   *NodeBase[T]
 	Terminal bool
+	expanded int32 // atomic flag
 }
 
 type GameOperations[T comparable] interface {
 	// Generate moves here, and add them as children to given node
-	ExpandNode(*NodeBase[T]) int
+	ExpandNode(*NodeBase[T]) uint64
 	// Make a move on the internal position definition, with given
 	// signature value (move)
 	Traverse(T)
@@ -56,6 +65,7 @@ type MCTS[T comparable] struct {
 	timer            *_Timer
 	selection_policy SelectionPolicy[T]
 	root             *NodeBase[T]
+	size             uint64
 }
 
 func NewMTCS[T comparable](
@@ -68,11 +78,15 @@ func NewMTCS[T comparable](
 		timer:            _NewTimer(),
 		selection_policy: selectionPolicy,
 		root:             &NodeBase[T]{},
+		size:             1,
 	}
-	operations.ExpandNode(mcts.root)
+
+	mcts.size += operations.ExpandNode(mcts.root)
 	return mcts
 }
 
+// This function only sets the limits, resets the counters, and the stop flag
+// doesn't actually start the search
 func (mcts *MCTS[T]) setupSearch() {
 	// Setup
 	mcts.timer.Movetime(mcts.limits.movetime)
@@ -83,9 +97,18 @@ func (mcts *MCTS[T]) setupSearch() {
 
 func (mcts *MCTS[T]) search(ops GameOperations[T]) {
 
+	var maxcount uint64 = math.MaxUint64
+	if !mcts.limits.InfiniteSize() {
+		maxcount = uint64(mcts.limits.byteSize) / (uint64(unsafe.Sizeof(*mcts.root)))
+	}
+
 	var node *NodeBase[T]
 
-	for !mcts.timer.IsEnd() && !mcts.stop.Load() && mcts.Nodes() <= uint32(mcts.limits.nodes) {
+	for !mcts.timer.IsEnd() &&
+		!mcts.stop.Load() &&
+		mcts.Nodes() <= uint32(mcts.limits.nodes) &&
+		atomic.LoadUint64(&mcts.size) < maxcount {
+
 		// Choose the most promising node
 		node = mcts.selection(ops)
 		// Get the result of the rollout/playout
@@ -125,15 +148,15 @@ func (mcts *MCTS[T]) SetLimits(limits *Limits) {
 func (mcts *MCTS[T]) String() string {
 	str := fmt.Sprintf("MCTS={Size=%d, Stats:{MaxDepth=%d, Nps=%d, Nodes=%d}, Stop=%v",
 		mcts.Size(), mcts.MaxDepth(), mcts.Nps(), mcts.Nodes(), mcts.stop.Load())
-	str += fmt.Sprintf(", Root=%v, Root.Children=%v", *mcts.root, mcts.root.Children)
+	str += fmt.Sprintf(", Root=%v, Root.Children=%v", mcts.root, mcts.root.Children)
 	return str
 }
 
 func countTreeNodes[T comparable](node *NodeBase[T]) int {
 	nodes := 1
-	for _, child := range node.Children {
-		if len(child.Children) > 0 {
-			nodes += countTreeNodes(&child)
+	for i := range node.Children {
+		if len(node.Children[i].Children) > 0 {
+			nodes += countTreeNodes(&node.Children[i])
 		} else {
 			nodes += 1
 		}
@@ -156,8 +179,8 @@ func (mcts *MCTS[T]) Reset() {
 // Select new root (play given move on the board, and update the tree)
 func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	index := -1
-	for i, node := range mcts.root.Children {
-		if node.NodeSignature == signature {
+	for i := range mcts.root.Children {
+		if mcts.root.Children[i].NodeSignature == signature {
 			index = i
 		}
 	}
@@ -167,7 +190,7 @@ func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	}
 
 	// Create a completely new node to avoid any lingering references
-	selectedChild := mcts.root.Children[index]
+	selectedChild := &mcts.root.Children[index]
 	newRoot := &NodeBase[T]{
 		NodeStats:     selectedChild.NodeStats,
 		NodeSignature: selectedChild.NodeSignature,
@@ -185,6 +208,10 @@ func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	return true
 }
 
+func (mcts *MCTS[T]) Root() *NodeBase[T] {
+	return mcts.root
+}
+
 func (mcts *MCTS[T]) RootSignature() T {
 	return mcts.BestChild(mcts.root).NodeSignature
 }
@@ -192,14 +219,35 @@ func (mcts *MCTS[T]) RootSignature() T {
 // Return best child, based on the number of visits
 func (mcts *MCTS[T]) BestChild(node *NodeBase[T]) *NodeBase[T] {
 	// most visits
-	maxVisits := 0
-	var bestChild *NodeBase[T]
-
+	// maxVisits := 0
+	// var bestChild *NodeBase[T]
 	// Choose the one with highest number of visits
+	// for i := 0; i < len(node.Children); i++ {
+	// 	if int(node.Children[i].Visits) > maxVisits {
+	// 		maxVisits = int(node.Children[i].Visits)
+	// 		bestChild = &node.Children[i]
+	// 	}
+	// }
+
+	const minVisitsThreshold = 0.4
+	bestChild := &node.Children[0]
+	bestWinRate := float64(node.Children[0].Wins) / float64(node.Children[0].Visits)
+
+	// Get max visits out the children
+	maxVisits := 0
 	for i := 0; i < len(node.Children); i++ {
-		if node.Children[i].Visits > maxVisits {
-			maxVisits = node.Children[i].Visits
-			bestChild = &node.Children[i]
+		maxVisits = max(int(node.Children[i].Visits), maxVisits)
+	}
+
+	// Go through the children
+	for i := 1; i < len(node.Children); i++ {
+		child := &node.Children[i]
+		if child.Visits > int32(minVisitsThreshold*float64(maxVisits)) {
+			winRate := float64(child.Wins) / float64(child.Visits)
+			if winRate > bestWinRate {
+				bestWinRate = winRate
+				bestChild = child
+			}
 		}
 	}
 
@@ -210,22 +258,38 @@ func (mcts *MCTS[T]) selection(ops GameOperations[T]) *NodeBase[T] {
 	node := mcts.root
 	depth := 0
 	for node.Children != nil {
-		node = mcts.selection_policy(node, mcts.root)
+		node = mcts.selection_policy(node)
 		ops.Traverse(node.NodeSignature)
 		depth++
 		mcts.nodes.Add(1)
+		// Apply virtual loss
+		// atomic.AddInt32(&node.Visits, virtualLoss)
 	}
 
 	// Add new children to this node, after finding leaf node
-	if node.Visits > 0 && !node.Terminal {
-		// Expand the node
-		ops.ExpandNode(node)
-		// Select child at random
-		node = &node.Children[rand.Int()%len(node.Children)]
-		// Traverse to this child
-		ops.Traverse(node.NodeSignature)
-		depth++
-		mcts.nodes.Add(1)
+	if atomic.LoadInt32(&node.Visits) > 0 && !node.Terminal {
+		// Expand the node, only if needed (expand flag is 0)
+		if atomic.CompareAndSwapInt32(&node.expanded, 0, 1) {
+			atomic.AddUint64(&mcts.size, ops.ExpandNode(node))
+			// Now it's expanded
+			atomic.StoreInt32(&node.expanded, 2)
+		}
+
+		// Currently expanding
+		for len(node.Children) == 0 && atomic.LoadInt32(&node.expanded) == 1 {
+		}
+
+		// Already expanded
+		if len(node.Children) > 0 && atomic.LoadInt32(&node.expanded) == 2 {
+			// Select child at random
+			node = &node.Children[rand.Int()%len(node.Children)]
+			// Apply again virtual loss
+			// atomic.AddInt32(&node.Visits, virtualLoss)
+			// Traverse to this child
+			ops.Traverse(node.NodeSignature)
+			depth++
+			mcts.nodes.Add(1)
+		}
 	}
 
 	// Set the 'max depth'
@@ -239,15 +303,22 @@ func (mcts *MCTS[T]) selection(ops GameOperations[T]) *NodeBase[T] {
 
 func (mcts *MCTS[T]) backpropagate(ops GameOperations[T], node *NodeBase[T], result Result) {
 	currentResult := result
+
 	for node != nil {
 
+		// node.Mutex.Lock()
 		if currentResult > 0 {
-			node.Wins += 1
+			// node.Wins += 1
+			atomic.AddInt32(&node.Wins, 1)
 		} else if currentResult < 0 {
-			node.Losses += 1
+			// node.Losses += 1
+			atomic.AddInt32(&node.Losses, 1)
 		}
 
-		node.NodeStats.Visits += 1
+		// Reverse virtual loss
+		// atomic.AddInt32(&node.Visits, -virtualLoss+1)
+		atomic.AddInt32(&node.Visits, 1)
+
 		node = node.Parent
 		ops.BackTraverse()
 		mcts.nodes.Add(1)

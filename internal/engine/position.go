@@ -26,6 +26,29 @@ func NewPosition() *Position {
 	return pos
 }
 
+// Make a deep copy of the position (has no shared memory with this object)
+func (p *Position) Clone() Position {
+	pos := Position{
+		stateList:    NewStateList(),
+		nextBigIndex: p.nextBigIndex,
+		termination:  p.termination,
+		hash:         p.hash,
+	}
+
+	for i := range 9 {
+		copy(pos.position[i][:], p.position[i][:])
+		pos.bigPositionState[i] = p.bigPositionState[i]
+	}
+	for i := range 2 {
+		for j := range 9 {
+			pos.bitboards[i][j] = p.bitboards[i][j]
+		}
+	}
+
+	copy(pos.stateList.list, p.stateList.list)
+	return pos
+}
+
 // Initialize the position
 func (p *Position) Init() {
 	p.stateList = NewStateList()

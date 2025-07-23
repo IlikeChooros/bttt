@@ -3,6 +3,7 @@ package uttt
 import (
 	"math"
 	"math/rand"
+	"sync/atomic"
 )
 
 // Actual UTTT mcts implementation
@@ -12,25 +13,31 @@ type UtttMCTS struct {
 }
 
 const (
-	explorationParam = 1.41
+	explorationParam = 0.7
 )
 
 // Default selection of the node policy
-var DefaultSelection SelectionPolicy[PosType] = func(parent, root *NodeBase[PosType]) *NodeBase[PosType] {
+var DefaultSelection SelectionPolicy[PosType] = func(node *NodeBase[PosType]) *NodeBase[PosType] {
 
 	max := float64(-1)
 	index := 0
+	parent_visits := atomic.LoadInt32(&node.Visits)
 
-	for i, node := range parent.Children {
-		// Unvisited
-		if node.Visits == 0 {
+	for i := 0; i < len(node.Children); i++ {
+		// Get the variables
+		visits := atomic.LoadInt32(&node.Children[i].Visits)
+
+		// Pick the unvisited one
+		if visits <= virtualLoss {
 			// Return pointer to the child
-			return &parent.Children[i]
+			return &node.Children[i]
 		}
 
+		wins := atomic.LoadInt32(&node.Children[i].Wins)
+
 		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
-		ucb := float64(node.Wins)/float64(node.Visits) +
-			explorationParam*math.Sqrt(math.Log(float64(node.Parent.Visits))/float64(node.Visits))
+		ucb := float64(wins)/float64(visits) +
+			explorationParam*math.Sqrt(math.Log(float64(parent_visits))/float64(visits))
 
 		if ucb > max {
 			max = ucb
@@ -38,7 +45,7 @@ var DefaultSelection SelectionPolicy[PosType] = func(parent, root *NodeBase[PosT
 		}
 	}
 
-	return &parent.Children[index]
+	return &node.Children[index]
 }
 
 func NewUtttMCTS(position Position) *UtttMCTS {
@@ -57,10 +64,31 @@ func NewUtttMCTS(position Position) *UtttMCTS {
 	return mcts
 }
 
+func (mcts *UtttMCTS) AsyncSearch() {
+	mcts.setupSearch()
+	threads := max(1, mcts.limits.nThreads)
+	for range threads {
+		go mcts.search(&UtttOperations{position: mcts.ops.position.Clone()})
+	}
+}
+
 // Start the search
 func (mcts *UtttMCTS) Search() {
 	mcts.setupSearch()
-	mcts.search(&mcts.ops)
+
+	// If that's multi-threaded search
+	if mcts.limits.nThreads > 1 {
+		for i := 0; i < mcts.limits.nThreads; i++ {
+			go mcts.search(&UtttOperations{position: mcts.ops.position.Clone()})
+		}
+
+		// Wait for the search to end
+		for mcts.IsThinking() {
+			continue
+		}
+	} else {
+		mcts.search(&mcts.ops)
+	}
 }
 
 // Default selection
@@ -98,7 +126,7 @@ type UtttOperations struct {
 	position Position
 }
 
-func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) int {
+func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) uint64 {
 	moves := ops.position.GenerateMoves()
 	node.Children = make([]NodeBase[PosType], moves.size)
 
@@ -116,7 +144,7 @@ func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) int {
 		}
 	}
 
-	return int(moves.size)
+	return uint64(moves.size)
 }
 
 func (ops *UtttOperations) Traverse(signature PosType) {

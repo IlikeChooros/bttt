@@ -9,7 +9,7 @@ import (
 // Monte carlo tree search
 
 func AsyncSearch(mcts *UtttMCTS) {
-	go mcts.Search()
+	mcts.AsyncSearch()
 
 	// Periodically print messages
 	var nps, nodes uint32
@@ -21,7 +21,7 @@ func AsyncSearch(mcts *UtttMCTS) {
 
 		if d != depth || nps != Nps || nodes != n {
 			nps, nodes, depth = Nps, n, d
-			fmt.Printf("\rinfo depth %d nps %d nodes %d", depth, nps, nodes)
+			// fmt.Printf("\rinfo depth %d nps %d nodes %d", depth, nps, nodes)
 		}
 	}
 

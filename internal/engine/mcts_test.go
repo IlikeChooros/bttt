@@ -316,7 +316,7 @@ func TestMCTSUCB1Calculation(t *testing.T) {
 	parent.Children = children
 
 	// Test selection policy
-	selected := DefaultSelection(parent, parent)
+	selected := DefaultSelection(parent)
 
 	// Should select unvisited node
 	if selected.Visits != 0 {
@@ -325,7 +325,7 @@ func TestMCTSUCB1Calculation(t *testing.T) {
 
 	// Remove unvisited node and test UCB1
 	parent.Children = children[:2]
-	selected = DefaultSelection(parent, parent)
+	selected = DefaultSelection(parent)
 
 	// Verify UCB1 calculation makes sense
 	if selected == nil {

@@ -9,14 +9,12 @@ type Limits struct {
 	nodes    uint64
 	movetime int
 	infinite bool
+	nThreads int
+	byteSize int64
 }
 
 func DefaultLimits() *Limits {
-	return &Limits{math.MaxInt, math.MaxInt, -1, true}
-}
-
-func (l *Limits) SetAll(depth int, nodes uint64, movetime int, infinite bool) {
-	l.depth, l.nodes, l.movetime, l.infinite = depth, nodes, movetime, infinite
+	return &Limits{math.MaxInt, math.MaxInt, -1, true, 1, -1}
 }
 
 // Set the maximum depth of the search
@@ -42,4 +40,22 @@ func (l *Limits) SetMovetime(movetime int) *Limits {
 
 func (l *Limits) SetInfinite(infinite bool) {
 	l.infinite = infinite
+}
+
+func (l *Limits) SetThreads(threads int) *Limits {
+	l.nThreads = max(threads, 1)
+	return l
+}
+
+func (l *Limits) SetMbSize(mbsize int64) *Limits {
+	return l.SetByteSize(mbsize * (1 << 20))
+}
+
+func (l *Limits) SetByteSize(bytesize int64) *Limits {
+	l.byteSize = bytesize
+	return l
+}
+
+func (l *Limits) InfiniteSize() bool {
+	return l.byteSize == -1
 }
