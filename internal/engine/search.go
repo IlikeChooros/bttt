@@ -6,6 +6,28 @@ import (
 	"time"
 )
 
+// Monte carlo tree search
+
+func AsyncSearch(mcts *UtttMCTS) {
+	go mcts.Search()
+
+	// Periodically print messages
+	var nps, nodes uint32
+	var depth int
+	for mcts.IsThinking() {
+		Nps := mcts.Nps()
+		n := mcts.Nodes()
+		d := mcts.MaxDepth()
+
+		if d != depth || nps != Nps || nodes != n {
+			nps, nodes, depth = Nps, n, d
+			fmt.Printf("\rinfo depth %d nps %d nodes %d", depth, nps, nodes)
+		}
+	}
+
+	fmt.Printf("\rinfo depth %d nps %d nodes %d pv %s\n", depth, nps, nodes, mcts.GetPv().String())
+}
+
 // Mate value for the search
 const (
 	MaxDepth          = 64

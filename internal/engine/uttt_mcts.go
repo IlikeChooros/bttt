@@ -8,6 +8,7 @@ import (
 // Actual UTTT mcts implementation
 type UtttMCTS struct {
 	MCTS[PosType]
+	ops UtttOperations
 }
 
 const (
@@ -15,14 +16,20 @@ const (
 )
 
 // Default selection of the node policy
-var DefaultSelection SelectionPolicy[PosType] = func(parent *NodeBase[PosType]) *NodeBase[PosType] {
+var DefaultSelection SelectionPolicy[PosType] = func(parent, root *NodeBase[PosType]) *NodeBase[PosType] {
 
 	max := float64(-1)
 	index := 0
 
 	for i, node := range parent.Children {
-		// UCB 1 : visits/wins + C * sqrt(ln(parent_visits)/visits)
-		ucb := float64(node.Visits)/float64(node.Wins) +
+		// Unvisited
+		if node.Visits == 0 {
+			// Return pointer to the child
+			return &parent.Children[i]
+		}
+
+		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
+		ucb := float64(node.Wins)/float64(node.Visits) +
 			explorationParam*math.Sqrt(math.Log(float64(node.Parent.Visits))/float64(node.Visits))
 
 		if ucb > max {
@@ -34,69 +41,113 @@ var DefaultSelection SelectionPolicy[PosType] = func(parent *NodeBase[PosType]) 
 	return &parent.Children[index]
 }
 
-func NewUtttMCTS() *UtttMCTS {
-	return &UtttMCTS{
+func NewUtttMCTS(position Position) *UtttMCTS {
+	uttt_ops := UtttOperations{position: position}
+	ops := GameOperations[PosType](&uttt_ops)
+	mcts := &UtttMCTS{
 		MCTS: *NewMTCS(
 			DefaultSelection,
-			GameOperations[PosType](&UtttOperations{}),
+			ops,
 		),
+		ops: uttt_ops,
 	}
+
+	// Check if the root node is terminal
+	mcts.root.Terminal = position.IsTerminated()
+	return mcts
+}
+
+// Start the search
+func (mcts *UtttMCTS) Search() {
+	mcts.setupSearch()
+	mcts.search(&mcts.ops)
+}
+
+// Default selection
+func (mcts *UtttMCTS) Selection() *NodeBase[PosType] {
+	return mcts.selection(&mcts.ops)
+}
+
+// Default backprop
+func (mcts *UtttMCTS) Backpropagate(node *NodeBase[PosType], result Result) {
+	mcts.backpropagate(&mcts.ops, node, result)
+}
+
+func (mcts *UtttMCTS) SetNotation(notation string) error {
+	mcts.Reset()
+	return mcts.ops.position.FromNotation(notation)
+}
+
+// Get the principal variation
+func (mcts *UtttMCTS) GetPv() *MoveList {
+	pv := NewMoveList()
+
+	node := mcts.root
+
+	// Simply select 'best child' until we don't have any children
+	// or the node is nil
+	for node != nil && len(node.Children) > 0 {
+		node = mcts.BestChild(node)
+		pv.AppendMove(node.NodeSignature)
+	}
+
+	return pv
 }
 
 type UtttOperations struct {
 	position Position
 }
 
-func (mcts *UtttOperations) ExpandNode(node *NodeBase[PosType]) {
-	moves := mcts.position.GenerateMoves()
+func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) int {
+	moves := ops.position.GenerateMoves()
 	node.Children = make([]NodeBase[PosType], moves.size)
 
 	for i, m := range moves.Slice() {
-		mcts.position.MakeMove(m)
-		isTerminal := mcts.position.IsTerminated()
-		mcts.position.UndoMove()
+		ops.position.MakeMove(m)
+		isTerminal := ops.position.IsTerminated()
+		ops.position.UndoMove()
 
 		node.Children[i] = NodeBase[PosType]{
-			NodeStats: NodeStats{
-				Wins: 0, Visits: 0,
-			},
+			NodeStats:     NodeStats{},
 			NodeSignature: m,
 			Children:      nil,
 			Parent:        node,
 			Terminal:      isTerminal,
 		}
 	}
+
+	return int(moves.size)
 }
 
-func (mcts *UtttOperations) Traverse(signature PosType) {
-	mcts.position.MakeMove(signature)
+func (ops *UtttOperations) Traverse(signature PosType) {
+	ops.position.MakeMove(signature)
 }
 
-func (mcts *UtttOperations) BackTraverse() {
-	mcts.position.UndoMove()
+func (ops *UtttOperations) BackTraverse() {
+	ops.position.UndoMove()
 }
 
 // Play the game until a terminal node is reached
-func (mcts *UtttOperations) Rollout() Result {
+func (ops *UtttOperations) Rollout() Result {
 	var moves *MoveList
 	var move PosType
 	var result Result = 0
 	var moveCount int = 0
-	ourSide := mcts.position.Turn()
+	ourSide := ops.position.Turn()
 
-	for !mcts.position.IsTerminated() {
+	for !ops.position.IsTerminated() {
 		moveCount++
-		moves = mcts.position.GenerateMoves()
+		moves = ops.position.GenerateMoves()
 
 		// Choose at random move
 		move = moves.moves[rand.Int31n(int32(moves.size))]
-		mcts.position.MakeMove(move)
+		ops.position.MakeMove(move)
 	}
 
 	// If that's not a draw
-	if mcts.position.termination != TerminationDraw {
+	if ops.position.termination != TerminationDraw {
 		// We lost
-		if mcts.position.Turn() == ourSide {
+		if ops.position.Turn() == ourSide {
 			result = -1
 		} else {
 			// We won
@@ -106,7 +157,7 @@ func (mcts *UtttOperations) Rollout() Result {
 
 	// Undo the moves
 	for range moveCount {
-		mcts.position.UndoMove()
+		ops.position.UndoMove()
 	}
 
 	return result

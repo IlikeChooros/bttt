@@ -28,6 +28,10 @@ func (t *_Timer) Start() time.Time {
 	return t.start
 }
 
+func (t *_Timer) Deltatime() int {
+	return max(int(time.Since(t.start).Milliseconds()), 1)
+}
+
 // In milliseconds
 func (t *_Timer) Movetime(movetime int) {
 	if movetime < 0 {

@@ -31,7 +31,7 @@ func TestTerminatedPositions(t *testing.T) {
 		"xxx6/xxx6/xxx6/9/9/9/9/9/9 x 4",
 		// o o o Impossible position: Winning position for O
 		"ooo6/9/ooo6/9/ooo6/xoxo5/ooo6/9/ooo6 x 1",
-		// IllegalPosition, by no avaible move
+		// ok position
 		"xoxxoxoxo/9/9/9/9/9/9/9/9 x 0",
 
 		// No termination
