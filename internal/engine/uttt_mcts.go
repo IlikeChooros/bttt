@@ -24,9 +24,6 @@ func NewUtttMCTS(position Position) *UtttMCTS {
 		),
 		ops: uttt_ops,
 	}
-
-	// Check if the root node is terminal
-	mcts.root.SetFlag(TerminalFlag(position.IsTerminated()))
 	return mcts
 }
 

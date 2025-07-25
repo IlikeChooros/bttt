@@ -45,6 +45,10 @@ func (mcts *MCTS[T]) setupSearch() {
 func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 	defer mcts.wg.Done()
 
+	if mcts.root.Terminal() {
+		return
+	}
+
 	// there is no computer with 18 446 744 073 giga bytes of memory anyway
 	var maxcount uint64 = math.MaxUint64
 	if !mcts.limits.InfiniteSize() {
@@ -75,7 +79,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
 	node := mcts.root
 	depth := 0
-	for node.Children != nil {
+	for len(node.Children) > 0 {
 		node = mcts.selection_policy(node)
 		ops.Traverse(node.NodeSignature)
 		depth++
