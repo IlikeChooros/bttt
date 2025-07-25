@@ -16,7 +16,7 @@ type Cli struct {
 // Get new cli object (pointer)
 func NewCli() *Cli {
 	cli := new(Cli)
-	cli.engine = NewEngine(16)
+	cli.engine = NewEngine()
 	return cli
 }
 
@@ -97,7 +97,7 @@ func (cli *Cli) parseArgument(arg string) error {
 		return cli.handlePosition(tokens[1:])
 
 	case "getpos":
-		fmt.Println(cli.engine.position.Notation())
+		fmt.Println(cli.engine.Position().Notation())
 	case "makemove":
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "makemove")
@@ -107,13 +107,13 @@ func (cli *Cli) parseArgument(arg string) error {
 			if mv == PosIllegal {
 				return fmt.Errorf("[CLI] invalid move notation, expected [A-C][1-3][a-c][1-3]")
 			}
-			if !cli.engine.position.IsLegal(mv) {
+			if !cli.engine.Position().IsLegal(mv) {
 				return fmt.Errorf("[CLI] Illegal move: %s", token)
 			}
-			cli.engine.position.MakeMove(mv)
+			cli.engine.Position().MakeMove(mv)
 		}
 	case "undomove":
-		cli.engine.position.UndoMove()
+		cli.engine.Position().UndoMove()
 	case "test":
 		if len(tokens) < 2 {
 			return fmt.Errorf(_cliErrorFormat, 1, "test")
@@ -172,7 +172,7 @@ func (cli *Cli) handleTest(tokens []string) error {
 			const Ntries = 10
 
 			for i := 0; i < Ntries; i++ {
-				nodes = Perft(cli.engine.position, depth, true, false)
+				nodes = Perft(cli.engine.Position(), depth, true, false)
 				avgtime += float64(time.Since(now).Microseconds()-int64(avgtime)) / float64(i+1)
 				fmt.Printf("\rProgress: %.1f (eta: %s)\033[K",
 					(float32(i+1)/Ntries)*100,
@@ -186,7 +186,7 @@ func (cli *Cli) handleTest(tokens []string) error {
 	if tokens[0] == "hash" {
 		return _parseIntToken(1, tokens, func(i int) {
 			tt := NewHashTable[HashEntryBase](1 << 20)
-			nodes, collisions := hashTest(i, cli.engine.position, tt)
+			nodes, collisions := hashTest(i, cli.engine.Position(), tt)
 
 			fmt.Printf("HashTest: %d nodes %d collisions (%.3f) load factor: %.3f\n",
 				nodes, collisions, float64(collisions)/float64(nodes), tt.LoadFactor())
@@ -205,11 +205,11 @@ func (cli *Cli) handleGo(tokens []string) error {
 	if tokens[0] == "perft" {
 		// Next token should be depth
 		return _parseIntToken(1, tokens, func(depth int) {
-			Perft(cli.engine.position, depth, false, true)
+			Perft(cli.engine.Position(), depth, false, true)
 		})
 	} else if tokens[0] == "valid-perft" {
 		return _parseIntToken(1, tokens, func(depth int) {
-			Perft(cli.engine.position, depth, true, true)
+			Perft(cli.engine.Position(), depth, true, true)
 		})
 	}
 
@@ -284,8 +284,7 @@ func (cli *Cli) handlePosition(tokens []string) error {
 	// If we don't run into any exceptions, set this position as new one
 	// Simply to preserve the position state, if user has given invalid position
 	if err == nil {
-		cli.engine.position = nil
-		cli.engine.position = pos
+		cli.engine.mcts.ops.position = *pos
 	}
 
 	// Return the error result

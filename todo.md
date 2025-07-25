@@ -109,6 +109,13 @@ I have tried:
   - Added piece square tables, pattern evaluation, etc.
 ```
 
+# New approach
+- [x] Use monte carlo tree search (MCTS) instead of alpha-beta pruning
+- [x] Support multi-threading
+- [ ] Proper pv support:
+  - [ ] Working for maximizing player (or for the player whose turn is set to 1)
+- [ ] Add channels to set the engine results
+- [ ] Add turn to the nodes, since this algorithm is used for zero-sum games anyway
 
 # Server
 

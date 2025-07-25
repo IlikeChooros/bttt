@@ -30,36 +30,16 @@ type SearchResult struct {
 	Nodes     uint64
 	Nps       uint64
 	Depth     int
+	Pv        MoveList
 }
 
-// Set the score value, will set the according type of the score
-func (s *SearchResult) SetValue(value int, turn TurnType) {
-	absValue := value
-	turnMultipier := 1
-	sign := 1
-	if turn == CircleTurn {
-		turnMultipier = -1
-	}
-
-	if value < 0 {
-		sign = -1
-		absValue = -absValue
-	}
-
-	// That's a mate score
-	if absValue >= MateTresholdValue {
-		// mate in <n> ply
-		s.Value = (absValue - MateTresholdValue) * turnMultipier * sign
-		s.ScoreType = MateScore
-	} else {
-		// Regular score
-		s.Value = value * turnMultipier
-		s.ScoreType = ValueScore
-	}
+func (s SearchResult) String() string {
+	return fmt.Sprintf("eval %s depth %d nps %d nodes %d pv %s",
+		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Pv.String())
 }
 
 // Get the string representation of the value
-func (s SearchResult) String() string {
+func (s SearchResult) StringValue() string {
 	if s.ScoreType == MateScore {
 		return fmt.Sprintf("%dM", s.Value)
 	}

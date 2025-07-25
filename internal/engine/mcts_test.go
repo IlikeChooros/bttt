@@ -40,7 +40,7 @@ func TestMCTSExpansion(t *testing.T) {
 	// Create a root node
 	root := &NodeBase[PosType]{
 		NodeStats: NodeStats{Visits: 1}, // Non-zero visits to trigger expansion
-		Terminal:  false,
+		GameFlags: TerminalFlag(false),
 	}
 
 	// Test expansion
@@ -358,30 +358,13 @@ func TestMCTSTerminalNodes(t *testing.T) {
 	mcts := NewUtttMCTS(*pos)
 
 	// Should recognize terminal state
-	if !mcts.root.Terminal {
+	if !mcts.root.Terminal() {
 		t.Error("Root should be terminal for finished game")
 	}
 
 	// Search should handle terminal nodes gracefully
 	mcts.limits.SetMovetime(50)
 	mcts.Search()
-}
-
-func BenchmarkMCTSSearch(b *testing.B) {
-	pos := NewPosition()
-	err := pos.FromNotation(StartingPosition)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	mcts := NewUtttMCTS(*pos)
-	mcts.limits.SetMovetime(10)
-
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
-		mcts.Search()
-		mcts.Reset()
-	}
 }
 
 func BenchmarkMCTSRollout(b *testing.B) {

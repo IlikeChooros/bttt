@@ -1,27 +1,12 @@
 package uttt
 
-import (
-	"io"
-	"os"
-	"sync/atomic"
-	"unsafe"
-)
-
 /*
 Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
 */
 type Engine struct {
-	position   *Position
-	limits     *Limits
-	timer      *_Timer
-	ttable     *HashTable[TTEntry]
-	result     SearchResult
-	stop       atomic.Bool
-	print      bool
-	isThinking atomic.Bool
-	pv         *MoveList
-	writer     io.Writer
+	mcts   *UtttMCTS
+	result SearchResult
 }
 
 // Initialize the package
@@ -30,21 +15,12 @@ func Init() {
 }
 
 // Get new engine instance
-func NewEngine(ttsize int) *Engine {
-	e := new(Engine)
-	e.position = NewPosition()
-	e.limits = DefaultLimits()
+func NewEngine() *Engine {
+	e := &Engine{
+		mcts: NewUtttMCTS(*NewPosition()),
+	}
 	e.result = SearchResult{}
-	e.timer = _NewTimer()
-	e.pv = NewMoveList()
-	e.writer = os.Stdout
-	e.ttable = NewHashTable[TTEntry](uint64(ttsize) * (1 << 20) / uint64(unsafe.Sizeof(TTEntry{})))
 	return e
-}
-
-// Set the output stream of the engine, by default uses standard output
-func (e *Engine) SetWriter(writer io.Writer) {
-	e.writer = writer
 }
 
 // Starting seraching for the bestmove
@@ -55,40 +31,38 @@ func (e *Engine) Search() {
 
 // Search the moves, in a blocking way
 func (e *Engine) Think(print bool) SearchResult {
-	e.isThinking.Store(true)
-	e.print = print
-	e._IterativeDeepening()
-	e.isThinking.Store(false)
-	return e.result
+	e.mcts.Search()
+	return e.mcts.SearchResult()
 }
 
 func (e *Engine) IsThinking() bool {
-	return e.isThinking.Load()
+	return e.mcts.IsThinking()
+}
+
+func (e *Engine) SetNotation(notation string) error {
+	return e.mcts.SetNotation(notation)
 }
 
 // Get the position object
 func (e *Engine) Position() *Position {
-	return e.position
+	return &e.mcts.ops.position
 }
 
 // Resets all search cache
 func (e *Engine) NewGame() {
-	// Wait for search to end
-	for e.IsThinking() {
-	}
-	e.ttable.Clear()
+	e.mcts.Reset()
 }
 
 // Set the limits
 func (e *Engine) SetLimits(limits Limits) {
-	*e.limits = limits
-	e.timer.Movetime(e.limits.movetime)
+	e.mcts.SetLimits(limits)
 }
 
 func (e *Engine) Stop() {
-	e.stop.Store(true)
+	e.mcts.Stop()
 }
 
 func (e *Engine) Pv() *MoveList {
-	return e.pv
+	pv, _ := e.mcts.Pv()
+	return pv
 }

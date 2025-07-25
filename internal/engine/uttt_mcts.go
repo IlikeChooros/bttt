@@ -1,7 +1,6 @@
 package uttt
 
 import (
-	"math"
 	"math/rand"
 	"sync/atomic"
 )
@@ -12,41 +11,7 @@ type UtttMCTS struct {
 	ops UtttOperations
 }
 
-const (
-	explorationParam = 0.7
-)
-
-// Default selection of the node policy
-var DefaultSelection SelectionPolicy[PosType] = func(node *NodeBase[PosType]) *NodeBase[PosType] {
-
-	max := float64(-1)
-	index := 0
-	parent_visits := atomic.LoadInt32(&node.Visits)
-
-	for i := 0; i < len(node.Children); i++ {
-		// Get the variables
-		visits := atomic.LoadInt32(&node.Children[i].Visits)
-
-		// Pick the unvisited one
-		if visits <= virtualLoss {
-			// Return pointer to the child
-			return &node.Children[i]
-		}
-
-		wins := atomic.LoadInt32(&node.Children[i].Wins)
-
-		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
-		ucb := float64(wins)/float64(visits) +
-			explorationParam*math.Sqrt(math.Log(float64(parent_visits))/float64(visits))
-
-		if ucb > max {
-			max = ucb
-			index = i
-		}
-	}
-
-	return &node.Children[index]
-}
+type UtttNode NodeBase[PosType]
 
 func NewUtttMCTS(position Position) *UtttMCTS {
 	uttt_ops := UtttOperations{position: position}
@@ -55,71 +20,104 @@ func NewUtttMCTS(position Position) *UtttMCTS {
 		MCTS: *NewMTCS(
 			DefaultSelection,
 			ops,
+			TerminalFlag(position.IsTerminated()),
 		),
 		ops: uttt_ops,
 	}
 
 	// Check if the root node is terminal
-	mcts.root.Terminal = position.IsTerminated()
+	mcts.root.SetFlag(TerminalFlag(position.IsTerminated()))
 	return mcts
 }
 
 func (mcts *UtttMCTS) AsyncSearch() {
-	mcts.setupSearch()
-	threads := max(1, mcts.limits.nThreads)
-	for range threads {
-		go mcts.search(&UtttOperations{position: mcts.ops.position.Clone()})
-	}
+	mcts.MCTS.SearchMultiThreaded(&mcts.ops)
 }
 
 // Start the search
 func (mcts *UtttMCTS) Search() {
-	mcts.setupSearch()
 
-	// If that's multi-threaded search
-	if mcts.limits.nThreads > 1 {
-		for i := 0; i < mcts.limits.nThreads; i++ {
-			go mcts.search(&UtttOperations{position: mcts.ops.position.Clone()})
-		}
+	// Run the search
+	mcts.SearchMultiThreaded(&mcts.ops)
 
-		// Wait for the search to end
-		for mcts.IsThinking() {
-			continue
-		}
-	} else {
-		mcts.search(&mcts.ops)
-	}
+	// Wait for the search to end
+	mcts.Synchronize()
 }
 
 // Default selection
 func (mcts *UtttMCTS) Selection() *NodeBase[PosType] {
-	return mcts.selection(&mcts.ops)
+	return mcts.MCTS.Selection(&mcts.ops)
 }
 
 // Default backprop
 func (mcts *UtttMCTS) Backpropagate(node *NodeBase[PosType], result Result) {
-	mcts.backpropagate(&mcts.ops, node, result)
+	mcts.MCTS.Backpropagate(&mcts.ops, node, result)
+}
+
+func (mcts *UtttMCTS) Ops() GameOperations[PosType] {
+	return &mcts.ops
+}
+
+func (mcts *UtttMCTS) Reset() {
+	mcts.MCTS.Reset(&mcts.ops, bool(mcts.ops.position.Turn()), mcts.ops.position.IsTerminated())
+}
+
+// Set the position
+func (mcts *UtttMCTS) SetPosition(position Position) {
+	mcts.ops.position = position
+	mcts.Reset()
 }
 
 func (mcts *UtttMCTS) SetNotation(notation string) error {
-	mcts.Reset()
+	defer mcts.Reset()
 	return mcts.ops.position.FromNotation(notation)
 }
 
-// Get the principal variation
-func (mcts *UtttMCTS) GetPv() *MoveList {
-	pv := NewMoveList()
-
-	node := mcts.root
-
-	// Simply select 'best child' until we don't have any children
-	// or the node is nil
-	for node != nil && len(node.Children) > 0 {
-		node = mcts.BestChild(node)
-		pv.AppendMove(node.NodeSignature)
+func (mcts *UtttMCTS) SearchResult() SearchResult {
+	pv, mate := mcts.Pv()
+	turn := 1
+	result := SearchResult{
+		Bestmove: mcts.RootSignature(),
+		Nodes:    uint64(mcts.Nodes()),
+		Nps:      uint64(mcts.Nps()),
+		Depth:    mcts.MaxDepth(),
+		Pv:       *pv,
 	}
 
-	return pv
+	if mcts.ops.position.Turn() == CircleTurn {
+		turn = -1
+	}
+
+	// Set the score
+	if mate {
+		result.ScoreType = MateScore
+		result.Value = pv.Size() * turn
+
+		// If the game ends on our turn, we are losing
+		if pv.Size()%2 == 0 {
+			result.Value = -result.Value
+		}
+	} else {
+		visits := int(atomic.LoadInt32(&mcts.root.Visits))
+		wins := int(atomic.LoadInt32(&mcts.root.Wins))
+		if mcts.root != nil && visits > 0 {
+			result.Value = 100 * wins / visits
+		} else {
+			result.Value = -1
+		}
+	}
+
+	return result
+}
+
+// Get the principal variation (pv, isTerminal, lastnode)
+func (mcts *UtttMCTS) Pv() (*MoveList, bool) {
+	nodes, mate := mcts.MCTS.Pv(BestChildWinRate)
+	pv := NewMoveList()
+	for _, node := range nodes {
+		pv.AppendMove(node.NodeSignature)
+	}
+	return pv, mate
 }
 
 type UtttOperations struct {
@@ -127,6 +125,7 @@ type UtttOperations struct {
 }
 
 func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) uint64 {
+
 	moves := ops.position.GenerateMoves()
 	node.Children = make([]NodeBase[PosType], moves.size)
 
@@ -135,13 +134,7 @@ func (ops *UtttOperations) ExpandNode(node *NodeBase[PosType]) uint64 {
 		isTerminal := ops.position.IsTerminated()
 		ops.position.UndoMove()
 
-		node.Children[i] = NodeBase[PosType]{
-			NodeStats:     NodeStats{},
-			NodeSignature: m,
-			Children:      nil,
-			Parent:        node,
-			Terminal:      isTerminal,
-		}
+		node.Children[i] = *NewBaseNode(node, m, isTerminal)
 	}
 
 	return uint64(moves.size)
@@ -189,4 +182,8 @@ func (ops *UtttOperations) Rollout() Result {
 	}
 
 	return result
+}
+
+func (ops UtttOperations) Clone() GameOperations[PosType] {
+	return GameOperations[PosType](&UtttOperations{position: ops.position.Clone()})
 }

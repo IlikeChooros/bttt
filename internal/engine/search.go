@@ -1,247 +1,146 @@
 package uttt
 
 import (
-	"fmt"
-	"slices"
-	"time"
+	"math"
+	"math/rand"
+	"sync/atomic"
+	"unsafe"
 )
 
-// Monte carlo tree search
-
-func AsyncSearch(mcts *UtttMCTS) {
-	mcts.AsyncSearch()
-
-	// Periodically print messages
-	var nps, nodes uint32
-	var depth int
-	for mcts.IsThinking() {
-		Nps := mcts.Nps()
-		n := mcts.Nodes()
-		d := mcts.MaxDepth()
-
-		if d != depth || nps != Nps || nodes != n {
-			nps, nodes, depth = Nps, n, d
-			// fmt.Printf("\rinfo depth %d nps %d nodes %d", depth, nps, nodes)
-		}
-	}
-
-	fmt.Printf("\rinfo depth %d nps %d nodes %d pv %s\n", depth, nps, nodes, mcts.GetPv().String())
+// Use when started multi-threaded search and want it to synchronize with this thread
+func (mcts *MCTS[T]) Synchronize() {
+	mcts.wg.Wait()
 }
 
-// Mate value for the search
-const (
-	MaxDepth          = 64
-	MateValue         = -1000000
-	MinValue          = MateValue - MaxDepth
-	MateTresholdValue = -MateValue
-)
+// Run multi-treaded search, to wait for the result, call Synchronize
+func (mcts *MCTS[T]) SearchMultiThreaded(ops GameOperations[T]) {
+	mcts.setupSearch()
+	threads := max(1, mcts.limits.nThreads)
 
-func (e *Engine) _PrintMsg(msg string) {
-	if e.print {
-		fmt.Fprint(e.writer, msg)
+	for range threads {
+		mcts.wg.Add(1)
+		go mcts.Search(ops.Clone())
 	}
 }
 
-// func (e *Engine) _GetPvMove(ply int) PosType {
-// 	if ply >= int(e.pv.size) {
-// 		return PosIllegal
-// 	}
-// 	return e.pv.moves[ply]
-// }
+// This function only sets the limits, resets the counters, and the stop flag
+// doesn't actually start the search
+func (mcts *MCTS[T]) setupSearch() {
+	// Setup
+	mcts.timer.Movetime(mcts.limits.movetime)
+	mcts.timer.Reset()
+	mcts.nodes.Store(0)
+	mcts.stop.Store(false)
+}
 
-// Get the principal variation from the transpostion table
-func (e *Engine) _LoadPv(rootmove PosType, maxdepth int) {
-	e.pv.Clear()
+// Actual search function implementation, simply calls:
+//
+// 1. selection - to choose the most promising node
+//
+// 2. rollout - to simulate the user-defined game, and get the result of the playout
+//
+// 3. backpropagate - to increment counters up to the root
+//
+// Until runs out of the allocated time, nodes, or memory
+func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
+	defer mcts.wg.Done()
+
+	// there is no computer with 18 446 744 073 giga bytes of memory anyway
+	var maxcount uint64 = math.MaxUint64
+	if !mcts.limits.InfiniteSize() {
+		maxcount = uint64(mcts.limits.byteSize) / (uint64(unsafe.Sizeof(*mcts.root)))
+	}
+
+	var node *NodeBase[T]
+
+	for !mcts.timer.IsEnd() &&
+		!mcts.stop.Load() &&
+		mcts.Nodes() <= uint32(mcts.limits.nodes) &&
+		atomic.LoadUint64(&mcts.size) < maxcount {
+
+		// Choose the most promising node
+		node = mcts.Selection(ops)
+		// Get the result of the rollout/playout
+		result := ops.Rollout()
+		mcts.Backpropagate(ops, node, result)
+		// Store the nps
+		mcts.nps.Store(mcts.nodes.Load() * 1000 / uint32(mcts.timer.Deltatime()))
+	}
+
+	// Synchronize all threads
+	mcts.stop.Store(true)
+}
+
+// Selects next child to expand, by user-defined selection policy
+func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
+	node := mcts.root
 	depth := 0
+	for node.Children != nil {
+		node = mcts.selection_policy(node)
+		ops.Traverse(node.NodeSignature)
+		depth++
+		mcts.nodes.Add(1)
+		// Apply virtual loss
+		// atomic.AddInt32(&node.Visits, virtualLoss)
+	}
 
-	e.position.MakeMove(rootmove)
-	e.pv.AppendMove(rootmove)
-
-	// Go through the transposition table
-	val, ok := e.ttable.Get(e.position.hash)
-	for ; ok && depth < maxdepth && val.Bestmove != PosIllegal; depth++ {
-		// Generate legal moves and see if that's a valid move
-		if !slices.Contains(e.position.GenerateMoves().Slice(), val.Bestmove) {
-			break
+	// Add new children to this node, after finding leaf node
+	if atomic.LoadInt32(&node.Visits) > 0 && !node.Terminal() {
+		// Expand the node, only if needed (expand flag is 0)
+		if atomic.CompareAndSwapInt32(&node.expanded, 0, 1) {
+			atomic.AddUint64(&mcts.size, ops.ExpandNode(node))
+			// Now it's expanded
+			atomic.StoreInt32(&node.expanded, 2)
 		}
 
-		e.pv.AppendMove(val.Bestmove)
-		e.position.MakeMove(val.Bestmove)
-		val, ok = e.ttable.Get(e.position.hash)
+		// Currently expanding
+		for len(node.Children) == 0 && atomic.LoadInt32(&node.expanded) == 1 {
+		}
+
+		// Already expanded
+		if len(node.Children) > 0 && atomic.LoadInt32(&node.expanded) == 2 {
+			// Select child at random
+			node = &node.Children[rand.Int()%len(node.Children)]
+			// Apply again virtual loss
+			// atomic.AddInt32(&node.Visits, virtualLoss)
+			// Traverse to this child
+			ops.Traverse(node.NodeSignature)
+			depth++
+			mcts.nodes.Add(1)
+		}
 	}
 
-	// Undo the moves
-	for range depth {
-		e.position.UndoMove()
+	// Set the 'max depth'
+	if depth > int(mcts.maxdepth.Load()) {
+		mcts.maxdepth.Store(int32(depth))
 	}
 
-	e.position.UndoMove()
+	// return the candidate
+	return node
 }
 
-func (e *Engine) _IterativeDeepening() {
+// Increment the counters (wins/losses/visits) along the tree path
+func (mcts *MCTS[T]) Backpropagate(ops GameOperations[T], node *NodeBase[T], result Result) {
+	currentResult := result
 
-	// Declare variables
-	e.result.Nodes = 0
-	pos := e.position
-	alpha := MateValue
-	beta := -MateValue
-	score := 0
-	bestscore := MinValue
-	e.stop.Store(false)
+	for node != nil {
 
-	moves := pos.GenerateMoves().Slice()
-
-	// Don't start the search in a terminated position
-	if pos.IsTerminated() {
-		e._PrintMsg(fmt.Sprintf("terminated %v\nbestmove (none)\n", pos.termination))
-		return
-	}
-
-	e.timer.Reset()
-	for d := 0; !e.stop.Load() && (d < MaxDepth && (e.limits.infinite || d < e.limits.depth)); d++ {
-		for _, m := range moves {
-			pos.MakeMove(m)
-			score = -e._NegaAlphaBeta(d, 1, -beta, -alpha)
-			pos.UndoMove()
-
-			// Now check if the timer has ended, if so this move wasn't fully searched,
-			// so discard it's value
-			if !e.limits.infinite && e.timer.IsEnd() {
-				e.Stop()
-			}
-
-			// Check if we should stop searching the moves
-			if e.stop.Load() {
-				break
-			}
-
-			if score > bestscore {
-				e.result.SetValue(score, e.position.Turn())
-				e.result.Bestmove = m
-				bestscore = score
-				alpha = max(alpha, score)
-
-				// That's a mate, go back
-				if e.result.ScoreType == MateScore {
-					e.Stop()
-					break
-				}
-			}
-
-			if alpha >= beta {
-				break
-			}
+		// node.Mutex.Lock()
+		if currentResult > 0 {
+			// node.Wins += 1
+			atomic.AddInt32(&node.Wins, 1)
+		} else if currentResult < 0 {
+			// node.Losses += 1
+			atomic.AddInt32(&node.Losses, 1)
 		}
 
-		// Reset
-		bestscore = MinValue
+		// Reverse virtual loss
+		// atomic.AddInt32(&node.Visits, -virtualLoss+1)
+		atomic.AddInt32(&node.Visits, 1)
 
-		// Get the number of milliseconds since the start
-		e._LoadPv(e.result.Bestmove, d+1)
-		deltatime := max(time.Since(e.timer.Start()).Milliseconds(), 1)
-		e.result.Nps = (e.result.Nodes * 1000) / uint64(deltatime)
-		e.result.Depth = d + 1
-		e._PrintMsg(
-			fmt.Sprintf("info depth %d score %s nps %d nodes %d time %dms pv %s\n",
-				d+1, e.result.String(), // depth, score
-				e.result.Nps, e.result.Nodes, deltatime, // nps, nodes, time
-				e.pv.String(), // pv
-			))
+		node = node.Parent
+		ops.BackTraverse()
+		mcts.nodes.Add(1)
+		currentResult = -currentResult
 	}
-
-	// Print the result
-	e._PrintMsg(fmt.Sprintf("bestmove %s\n", e.result.Bestmove.String()))
-}
-
-func (e *Engine) _NegaAlphaBeta(depth, ply, alpha, beta int) int {
-
-	e.result.Nodes++
-
-	// Check if we calculated value of this node already, with requirement
-	// of bigger or equal to depth of our current node's depth
-
-	oldAlpha := alpha
-	hash := e.position.hash
-	if val, ok := e.ttable.Get(hash); ok && val.Depth >= depth {
-		// Use the cached value
-		if val.NodeType == Exact {
-			return val.Score
-		} else if val.NodeType == LowerBound {
-			alpha = max(alpha, val.Score)
-		} else {
-			beta = min(beta, val.Score)
-		}
-
-		if alpha >= beta {
-			return val.Score
-		}
-	}
-
-	pos := e.position
-	bestvalue := MateValue - ply
-	value := 0
-	bestmove := PosIllegal
-
-	// Check if that's terminated node, if so return according value
-	if pos.IsTerminated() {
-		if pos.termination == TerminationDraw {
-			bestvalue = 0 // Draw value is 0
-		}
-
-		return bestvalue
-	}
-
-	// If we reach the terminating depth, return the static evaluation of the position
-	if depth <= 0 {
-		return Evaluate(pos)
-	}
-
-	// Go through the moves
-	moves := pos.GenerateMoves()
-	// MoveOrdering(moves, e.position, e._GetPvMove(ply), ply)
-
-	for _, m := range moves.Slice() {
-
-		pos.MakeMove(m)
-		value = -e._NegaAlphaBeta(depth-1, ply+1, -beta, -alpha)
-		pos.UndoMove()
-
-		if value > bestvalue {
-			bestmove = m
-			bestvalue = value
-			alpha = max(alpha, value)
-		}
-
-		// Check the timer
-		if !e.limits.infinite && e.timer.IsEnd() {
-			return bestvalue
-		}
-
-		if alpha >= beta {
-			break
-		}
-	}
-
-	// Set the hash entry value
-	newEntry := TTEntry{}
-	newEntry.Bestmove = bestmove
-	newEntry.Depth = depth
-	newEntry.Hash = hash
-	newEntry.Score = bestvalue
-
-	if bestvalue >= beta {
-		// Beta cutoff
-		newEntry.NodeType = UpperBound
-		// _UpdateHistory(_boolToInt(bool(e.position.Turn())), bestmove, depth*depth)
-	}
-	if bestvalue <= oldAlpha {
-		// Lowerbound value
-		newEntry.NodeType = LowerBound
-	} else {
-		newEntry.NodeType = Exact
-	}
-
-	e.ttable.Set(hash, newEntry)
-
-	return bestvalue
 }

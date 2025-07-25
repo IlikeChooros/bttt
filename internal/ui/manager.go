@@ -21,7 +21,7 @@ type Manager struct {
 func NewManager() *Manager {
 	engine.Init()
 	m := &Manager{
-		e:      engine.NewEngine(16),
+		e:      engine.NewEngine(),
 		board:  &UltimateBoard{},
 		limits: engine.DefaultLimits().SetMovetime(1000),
 	}

@@ -14,12 +14,12 @@ func main() {
 	pos := uttt.NewPosition()
 	_ = pos.FromNotation(uttt.StartingPosition)
 	mcts := uttt.NewUtttMCTS(*pos)
-	mcts.SetLimits(uttt.DefaultLimits().SetThreads(4).SetMbSize(16))
-	uttt.AsyncSearch(mcts)
+	mcts.SetLimits(*uttt.DefaultLimits().SetThreads(4).SetMovetime(1000))
+	mcts.Search()
 
-	fmt.Printf("Tree size=%d\n", mcts.Size())
+	fmt.Printf("Tree size=%d (count=%d)\n", mcts.Size(), mcts.Count())
 
-	bestchild := mcts.BestChild(mcts.Root())
+	bestchild := mcts.BestChild(mcts.Root(), uttt.BestChildWinRate)
 	children := mcts.Root().Children
 	for i := range len(children) {
 		node := &children[i]
@@ -36,6 +36,8 @@ func main() {
 			fmt.Println()
 		}
 	}
+
+	fmt.Println(mcts.SearchResult())
 
 	// cli := uttt.NewCli()
 	// cli.Start()

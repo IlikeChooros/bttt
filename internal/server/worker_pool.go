@@ -89,7 +89,7 @@ func (wp *WorkerPool) worker(ctx context.Context) {
 	defer wp.wg.Done()
 
 	// Each worker has it's own engine instance
-	engine := uttt.NewEngine(16)
+	engine := uttt.NewEngine()
 
 	for {
 		select {
@@ -169,6 +169,6 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 		Depth: result.Depth,
 		Pv:    pv,
 		Nps:   result.Nps,
-		Eval:  result.String(),
+		Eval:  result.StringValue(),
 	}
 }

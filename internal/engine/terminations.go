@@ -11,6 +11,13 @@ const (
 	TerminationIllegalPosition Termination = 16
 )
 
+// horizontal, vertical and diagonal patterns as bitboards
+var _winningBitboardPatterns [8]uint = [...]uint{
+	0b111000000, 0b000111000, 0b000000111,
+	0b100100100, 0b010010010, 0b001001001,
+	0b100010001, 0b001010100,
+}
+
 var _patterns = [8][3]int{
 	{0, 1, 2}, {3, 4, 5}, {6, 7, 8},
 	{0, 3, 6}, {1, 4, 7}, {2, 5, 8},
