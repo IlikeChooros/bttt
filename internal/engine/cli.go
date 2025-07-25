@@ -202,12 +202,13 @@ func (cli *Cli) handleTest(tokens []string) error {
 func (cli *Cli) handleGo(tokens []string) error {
 
 	// Handle 'perft' command separately
-	if tokens[0] == "perft" {
+	switch tokens[0] {
+	case "perft":
 		// Next token should be depth
 		return _parseIntToken(1, tokens, func(depth int) {
 			Perft(cli.engine.Position(), depth, false, true)
 		})
-	} else if tokens[0] == "valid-perft" {
+	case "valid-perft":
 		return _parseIntToken(1, tokens, func(depth int) {
 			Perft(cli.engine.Position(), depth, true, true)
 		})
@@ -250,7 +251,8 @@ func (cli *Cli) handleGo(tokens []string) error {
 	// Run the engine
 	if err == nil {
 		cli.engine.SetLimits(*limits)
-		cli.engine.Think(true)
+		results := cli.engine.Think(true)
+		fmt.Println("info", results)
 	}
 
 	return err

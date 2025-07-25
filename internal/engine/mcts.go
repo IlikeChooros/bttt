@@ -72,9 +72,9 @@ func DefaultSelection(node *NodeBase[PosType]) *NodeBase[PosType] {
 
 // visit/win/loss count of the node, should be accessed only with atomic operations
 type NodeStats struct {
-	Visits int32
-	Wins   int32
-	Losses int32
+	Visits int32 // Incremented each time this node is on a path: selected node - root
+	Wins   int32 // From this node's perspective (not root's!), number of wins we get from this position forward
+	Losses int32 // Same as wins, but it counts number of losses
 }
 
 type GameFlags uint8
@@ -90,7 +90,7 @@ type NodeBase[T comparable] struct {
 	Children      []NodeBase[T]
 	Parent        *NodeBase[T]
 	GameFlags     GameFlags
-	expanded      int32 // atomic flag
+	state         atomic.Int32 // atomic flag for 'expanded'
 }
 
 func NewBaseNode[T comparable](parent *NodeBase[T], signature T, terminated bool) *NodeBase[T] {
@@ -103,7 +103,7 @@ func NewBaseNode[T comparable](parent *NodeBase[T], signature T, terminated bool
 }
 
 // Reads the game flags, and return wheter the node is terminal
-func (node NodeBase[T]) Terminal() bool {
+func (node *NodeBase[T]) Terminal() bool {
 	return node.GameFlags&TerminalMask == TerminalMask
 }
 
@@ -149,7 +149,7 @@ type MCTS[T comparable] struct {
 	timer            *_Timer
 	selection_policy SelectionPolicy[T]
 	root             *NodeBase[T]
-	size             uint64
+	size             atomic.Uint64
 	wg               sync.WaitGroup
 }
 
@@ -165,7 +165,9 @@ func NewMTCS[T comparable](
 		selection_policy: selectionPolicy,
 		root:             &NodeBase[T]{GameFlags: flags},
 	}
-	mcts.size = 1 + operations.ExpandNode(mcts.root)
+
+	mcts.root.state.Store(2)
+	mcts.size.Store(1 + operations.ExpandNode(mcts.root))
 	return mcts
 }
 
@@ -222,7 +224,7 @@ func (mcts *MCTS[T]) Count() int {
 // Get the size of the tree
 func (mcts *MCTS[T]) Size() int {
 	// Count every node in the tree
-	return int(atomic.LoadUint64(&mcts.size))
+	return int(mcts.size.Load())
 }
 
 // Remove previous tree
@@ -236,10 +238,10 @@ func (mcts *MCTS[T]) Reset(ops GameOperations[T], turn, isTerminated bool) {
 	// Make new root
 	var signatureNull T
 	mcts.root = NewBaseNode(nil, signatureNull, isTerminated)
-	mcts.size = 1
+	mcts.size.Store(1)
 
 	if !isTerminated {
-		mcts.size += ops.ExpandNode(mcts.root)
+		mcts.size.Add(ops.ExpandNode(mcts.root))
 	}
 }
 
@@ -274,7 +276,7 @@ func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	mcts.root = newRoot
 
 	// Update the counters
-	mcts.size = uint64(mcts.Count())
+	mcts.size.Store(uint64(mcts.Count()))
 	return true
 }
 
@@ -350,12 +352,12 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 
 // Get the principal variation (ie. the best sequence of moves)
 // based on given best child policy
-func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]NodeBase[T], bool) {
+func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]*NodeBase[T], bool) {
 	if mcts.root == nil {
 		return nil, false
 	}
 
-	pv := make([]NodeBase[T], 0, mcts.MaxDepth())
+	pv := make([]*NodeBase[T], 0, mcts.MaxDepth())
 	node := mcts.root
 	mate := false
 
@@ -367,7 +369,7 @@ func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]NodeBase[T], bool) {
 			break
 		}
 
-		pv = append(pv, *node)
+		pv = append(pv, node)
 
 		// If that's a terminal node, we got a mate score
 		if node.Terminal() {

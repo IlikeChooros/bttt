@@ -60,7 +60,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 	for !mcts.timer.IsEnd() &&
 		!mcts.stop.Load() &&
 		mcts.Nodes() <= uint32(mcts.limits.nodes) &&
-		atomic.LoadUint64(&mcts.size) < maxcount {
+		mcts.size.Load() < maxcount {
 
 		// Choose the most promising node
 		node = mcts.Selection(ops)
@@ -79,7 +79,12 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
 	node := mcts.root
 	depth := 0
-	for len(node.Children) > 0 {
+
+	// Currently expanding
+	for len(node.Children) == 0 && node.state.Load() == 1 {
+	}
+
+	for len(node.Children) > 0 && node.state.Load() == 2 {
 		node = mcts.selection_policy(node)
 		ops.Traverse(node.NodeSignature)
 		depth++
@@ -91,18 +96,18 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
 	// Add new children to this node, after finding leaf node
 	if atomic.LoadInt32(&node.Visits) > 0 && !node.Terminal() {
 		// Expand the node, only if needed (expand flag is 0)
-		if atomic.CompareAndSwapInt32(&node.expanded, 0, 1) {
-			atomic.AddUint64(&mcts.size, ops.ExpandNode(node))
-			// Now it's expanded
-			atomic.StoreInt32(&node.expanded, 2)
+		if node.state.CompareAndSwap(0, 1) {
+			mcts.size.Add(ops.ExpandNode(node))
+			// Now it's state
+			node.state.Store(2)
 		}
 
 		// Currently expanding
-		for len(node.Children) == 0 && atomic.LoadInt32(&node.expanded) == 1 {
+		for len(node.Children) == 0 && node.state.Load() == 1 {
 		}
 
-		// Already expanded
-		if len(node.Children) > 0 && atomic.LoadInt32(&node.expanded) == 2 {
+		// Already state
+		if len(node.Children) > 0 && node.state.Load() == 2 {
 			// Select child at random
 			node = &node.Children[rand.Int()%len(node.Children)]
 			// Apply again virtual loss

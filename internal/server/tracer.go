@@ -21,19 +21,17 @@ func nextRequestId() string {
 	return strconv.FormatInt(time.Now().UnixNano(), 10)
 }
 
-func TracingMiddleware() func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			requestId := r.Header.Get(RequestIDTag)
+func TracingMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestId := r.Header.Get(RequestIDTag)
 
-			if requestId == "" {
-				requestId = nextRequestId()
-			}
+		if requestId == "" {
+			requestId = nextRequestId()
+		}
 
-			// Attach request ID to context and the incoming request
-			context := context.WithValue(r.Context(), RequestIDKey, requestId)
-			w.Header().Set(RequestIDTag, requestId)
-			next.ServeHTTP(w, r.WithContext(context))
-		})
-	}
+		// Attach request ID to context and the incoming request
+		context := context.WithValue(r.Context(), RequestIDKey, requestId)
+		w.Header().Set(RequestIDTag, requestId)
+		next.ServeHTTP(w, r.WithContext(context))
+	})
 }

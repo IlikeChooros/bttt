@@ -47,8 +47,8 @@ func (l *Limits) SetThreads(threads int) *Limits {
 	return l
 }
 
-func (l *Limits) SetMbSize(mbsize int64) *Limits {
-	return l.SetByteSize(mbsize * (1 << 20))
+func (l *Limits) SetMbSize(mbsize int) *Limits {
+	return l.SetByteSize(int64(mbsize) * (1 << 20))
 }
 
 func (l *Limits) SetByteSize(bytesize int64) *Limits {

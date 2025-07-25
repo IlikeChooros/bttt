@@ -36,6 +36,8 @@ type EngineConfig struct {
 	DefaultLimits *uttt.Limits // Default limits struct for the engine
 	MaxDepth      int
 	MaxMovetime   int // In milliseconds (10000 ms by default)
+	MaxSizeMb     int // maximum size of the tree in mb
+	Threads       int // number of threads to use by default
 }
 
 // Default configs
@@ -63,9 +65,16 @@ func LoadConfig() {
 			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 30*time.Second),
 		},
 		Engine: EngineConfig{
-			DefaultLimits: uttt.DefaultLimits().SetMovetime(1000),
+			DefaultLimits: uttt.DefaultLimits(),
 			MaxDepth:      utils.GetEnvInt("MAX_DEPTH", 20),
 			MaxMovetime:   utils.GetEnvInt("MAX_MOVETIME", 20000),
+			MaxSizeMb:     utils.GetEnvInt("MAX_TREE_SIZE_MB", 16),
+			Threads:       utils.GetEnvInt("N_SEARCH_THREADS", 4),
 		},
 	}
+
+	DefaultConfig.Engine.DefaultLimits.
+		SetMovetime(1000).
+		SetMbSize(DefaultConfig.Engine.MaxSizeMb).
+		SetThreads(DefaultConfig.Engine.Threads)
 }

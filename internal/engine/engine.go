@@ -5,8 +5,7 @@ Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
 */
 type Engine struct {
-	mcts   *UtttMCTS
-	result SearchResult
+	mcts *UtttMCTS
 }
 
 // Initialize the package
@@ -16,11 +15,9 @@ func Init() {
 
 // Get new engine instance
 func NewEngine() *Engine {
-	e := &Engine{
+	return &Engine{
 		mcts: NewUtttMCTS(*NewPosition()),
 	}
-	e.result = SearchResult{}
-	return e
 }
 
 // Starting seraching for the bestmove
@@ -65,4 +62,8 @@ func (e *Engine) Stop() {
 func (e *Engine) Pv() *MoveList {
 	pv, _ := e.mcts.Pv()
 	return pv
+}
+
+func (e *Engine) Mcts() *UtttMCTS {
+	return e.mcts
 }

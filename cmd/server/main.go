@@ -38,7 +38,7 @@ func main() {
 
 	// Create new router
 	router := mux.NewRouter()
-	router.Use(server.TracingMiddleware())
+	router.Use(server.TracingMiddleware)
 	router.Use(server.LoggingMiddleware(logger))
 	router.Use(server.MetricsMiddleware)
 	router.Use(server.CorsMiddleware)
