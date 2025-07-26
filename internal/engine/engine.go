@@ -1,5 +1,7 @@
 package uttt
 
+import "uttt/internal/mcts"
+
 /*
 Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
@@ -51,7 +53,7 @@ func (e *Engine) NewGame() {
 }
 
 // Set the limits
-func (e *Engine) SetLimits(limits Limits) {
+func (e *Engine) SetLimits(limits *mcts.Limits) {
 	e.mcts.SetLimits(limits)
 }
 

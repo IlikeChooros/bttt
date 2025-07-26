@@ -1,4 +1,4 @@
-package uttt
+package mcts
 
 import (
 	"time"
@@ -16,6 +16,10 @@ func _NewTimer() *_Timer {
 // Check if this timer has ended
 func (t *_Timer) IsEnd() bool {
 	return t.duration > 0 && time.Since(t.start) >= t.duration
+}
+
+func (t *_Timer) IsSet() bool {
+	return t.duration != -1
 }
 
 // Set the 'start' as now

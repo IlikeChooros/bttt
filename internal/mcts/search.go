@@ -1,10 +1,8 @@
-package uttt
+package mcts
 
 import (
-	"math"
 	"math/rand"
 	"sync/atomic"
-	"unsafe"
 )
 
 // Use when started multi-threaded search and want it to synchronize with this thread
@@ -15,7 +13,7 @@ func (mcts *MCTS[T]) Synchronize() {
 // Run multi-treaded search, to wait for the result, call Synchronize
 func (mcts *MCTS[T]) SearchMultiThreaded(ops GameOperations[T]) {
 	mcts.setupSearch()
-	threads := max(1, mcts.limits.nThreads)
+	threads := max(1, mcts.Limiter.Limits().NThreads)
 
 	for range threads {
 		mcts.wg.Add(1)
@@ -27,10 +25,11 @@ func (mcts *MCTS[T]) SearchMultiThreaded(ops GameOperations[T]) {
 // doesn't actually start the search
 func (mcts *MCTS[T]) setupSearch() {
 	// Setup
-	mcts.timer.Movetime(mcts.limits.movetime)
-	mcts.timer.Reset()
+	// mcts.timer.Movetime(mcts.Limiter.Limits.Movetime)
+	// mcts.timer.Reset()
+	mcts.Limiter.Reset()
 	mcts.nodes.Store(0)
-	mcts.stop.Store(false)
+	// mcts.stop.Store(false)
 }
 
 // Actual search function implementation, simply calls:
@@ -45,22 +44,19 @@ func (mcts *MCTS[T]) setupSearch() {
 func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 	defer mcts.wg.Done()
 
-	if mcts.root.Terminal() {
+	if mcts.Root.Terminal() {
 		return
 	}
 
 	// there is no computer with 18 446 744 073 giga bytes of memory anyway
-	var maxcount uint64 = math.MaxUint64
-	if !mcts.limits.InfiniteSize() {
-		maxcount = uint64(mcts.limits.byteSize) / (uint64(unsafe.Sizeof(*mcts.root)))
-	}
+	// var maxcount uint32 = math.MaxUint32
+	// if !mcts.Limiter.Limits.InfiniteSize() {
+	// 	maxcount = uint32(mcts.Limiter.Limits.ByteSize) / (uint32(unsafe.Sizeof(*mcts.Root)))
+	// }
 
 	var node *NodeBase[T]
 
-	for !mcts.timer.IsEnd() &&
-		!mcts.stop.Load() &&
-		mcts.Nodes() <= uint32(mcts.limits.nodes) &&
-		mcts.size.Load() < maxcount {
+	for mcts.Limiter.Ok(mcts.Nodes(), mcts.Size()) {
 
 		// Choose the most promising node
 		node = mcts.Selection(ops)
@@ -68,20 +64,20 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 		result := ops.Rollout()
 		mcts.Backpropagate(ops, node, result)
 		// Store the nps
-		mcts.nps.Store(mcts.nodes.Load() * 1000 / uint32(mcts.timer.Deltatime()))
+		mcts.nps.Store(mcts.nodes.Load() * 1000 / mcts.Limiter.Elapsed())
 	}
 
 	// Synchronize all threads
-	mcts.stop.Store(true)
+	mcts.Limiter.Stop()
 }
 
 // Selects next child to expand, by user-defined selection policy
 func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
-	node := mcts.root
+	node := mcts.Root
 	depth := 0
 
 	// Currently expanding
-	for len(node.Children) == 0 && node.state.Load() == 1 {
+	for node.state.Load() == 1 {
 	}
 
 	for len(node.Children) > 0 && node.state.Load() == 2 {
@@ -96,17 +92,17 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T]) *NodeBase[T] {
 	// Add new children to this node, after finding leaf node
 	if atomic.LoadInt32(&node.Visits) > 0 && !node.Terminal() {
 		// Expand the node, only if needed (expand flag is 0)
-		if node.state.CompareAndSwap(0, 1) {
+		if mcts.Limiter.Expand() && node.state.CompareAndSwap(0, 1) {
 			mcts.size.Add(ops.ExpandNode(node))
 			// Now it's state
 			node.state.Store(2)
 		}
 
 		// Currently expanding
-		for len(node.Children) == 0 && node.state.Load() == 1 {
+		for node.state.Load() == 1 {
 		}
 
-		// Already state
+		// Already set
 		if len(node.Children) > 0 && node.state.Load() == 2 {
 			// Select child at random
 			node = &node.Children[rand.Int()%len(node.Children)]

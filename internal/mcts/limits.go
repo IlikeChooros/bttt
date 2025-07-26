@@ -1,49 +1,56 @@
-package uttt
+package mcts
 
 import (
 	"math"
 )
 
 type Limits struct {
-	depth    int
-	nodes    uint64
-	movetime int
-	infinite bool
-	nThreads int
-	byteSize int64
+	Depth    int
+	Nodes    uint32
+	Movetime int
+	Infinite bool
+	NThreads int
+	ByteSize int64
 }
 
+const (
+	DefaultDepthLimit    int    = math.MaxInt
+	DefaultNodeLimit     uint32 = math.MaxInt32
+	DefaultMovetimeLimit int    = -1
+	DefaultByteSizeLimit int64  = -1
+)
+
 func DefaultLimits() *Limits {
-	return &Limits{math.MaxInt, math.MaxInt, -1, true, 1, -1}
+	return &Limits{DefaultDepthLimit, DefaultNodeLimit, DefaultMovetimeLimit, true, 1, DefaultByteSizeLimit}
 }
 
 // Set the maximum depth of the search
 func (l *Limits) SetDepth(depth int) *Limits {
-	l.depth = depth
-	l.infinite = false
+	l.Depth = depth
+	l.Infinite = false
 	return l
 }
 
 // Set the maxiumum number of nodes engine can go through
-func (l *Limits) SetNodes(nodes uint64) *Limits {
-	l.nodes = nodes
-	l.infinite = false
+func (l *Limits) SetNodes(nodes uint32) *Limits {
+	l.Nodes = nodes
+	l.Infinite = false
 	return l
 }
 
 // Set the maximum time for engine to think
 func (l *Limits) SetMovetime(movetime int) *Limits {
-	l.movetime = movetime
-	l.infinite = false
+	l.Movetime = movetime
+	l.Infinite = false
 	return l
 }
 
 func (l *Limits) SetInfinite(infinite bool) {
-	l.infinite = infinite
+	l.Infinite = infinite
 }
 
 func (l *Limits) SetThreads(threads int) *Limits {
-	l.nThreads = max(threads, 1)
+	l.NThreads = max(threads, 1)
 	return l
 }
 
@@ -52,10 +59,11 @@ func (l *Limits) SetMbSize(mbsize int) *Limits {
 }
 
 func (l *Limits) SetByteSize(bytesize int64) *Limits {
-	l.byteSize = bytesize
+	l.ByteSize = bytesize
+	l.Infinite = false
 	return l
 }
 
 func (l *Limits) InfiniteSize() bool {
-	return l.byteSize == -1
+	return l.ByteSize == -1
 }

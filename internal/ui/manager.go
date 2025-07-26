@@ -8,13 +8,14 @@ import (
 	"strings"
 
 	engine "uttt/internal/engine"
+	"uttt/internal/mcts"
 )
 
 // Manager handles user input and coordinates the engine and UI rendering.
 type Manager struct {
 	e      *engine.Engine
 	board  *UltimateBoard
-	limits *engine.Limits
+	limits *mcts.Limits
 }
 
 // NewManager constructs a new Manager, initializes the engine, and sets up a board.
@@ -23,7 +24,7 @@ func NewManager() *Manager {
 	m := &Manager{
 		e:      engine.NewEngine(),
 		board:  &UltimateBoard{},
-		limits: engine.DefaultLimits().SetMovetime(1000),
+		limits: mcts.DefaultLimits().SetMovetime(1000),
 	}
 	return m
 }
@@ -75,7 +76,7 @@ func (m *Manager) handleCommand(line string) error {
 	case "getpos":
 		fmt.Print(m.e.Position().Notation(), CLEAR_LINE_FROM_CURSOR, CursorMoveVertical(1))
 	case "eval": // Let the engine search and play the best move.
-		m.e.SetLimits(*m.limits)
+		m.e.SetLimits(m.limits)
 		result := m.e.Think(false)
 		if result.Bestmove != engine.PosIllegal && m.e.Position().IsLegal(result.Bestmove) {
 			m.e.Position().MakeMove(result.Bestmove)
@@ -124,7 +125,7 @@ func (m *Manager) handleMake(moves []string) error {
 	fmt.Print(CLEAR_SCREEN_FROM_CURSOR)
 
 	// Let engine respond automatically
-	m.e.SetLimits(*m.limits)
+	m.e.SetLimits(m.limits)
 	res := m.e.Think(false)
 	if res.Bestmove != engine.PosIllegal && m.e.Position().IsLegal(res.Bestmove) {
 		m.makeMove(res.Bestmove)
@@ -157,7 +158,7 @@ func (m *Manager) setNodes(tokens []string) error {
 	if err != nil {
 		return err
 	}
-	m.limits.SetNodes(uint64(nodes))
+	m.limits.SetNodes(uint32(nodes))
 	PrintOK("[Manager]", fmt.Sprintf("Nodes set to %d.", nodes))
 	return nil
 }

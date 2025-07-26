@@ -2,6 +2,7 @@ package uttt
 
 import (
 	"testing"
+	"uttt/internal/mcts"
 )
 
 func TestMates(t *testing.T) {
@@ -20,7 +21,7 @@ func TestMates(t *testing.T) {
 	}
 
 	engine := NewEngine()
-	engine.SetLimits(*DefaultLimits().SetNodes(400))
+	engine.SetLimits(mcts.DefaultLimits().SetNodes(400))
 
 	for i, pos := range positions {
 		if err := engine.SetNotation(pos); err != nil {

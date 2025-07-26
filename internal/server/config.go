@@ -3,7 +3,7 @@ package server
 import (
 	"fmt"
 	"time"
-	uttt "uttt/internal/engine"
+	"uttt/internal/mcts"
 	"uttt/internal/utils"
 
 	"github.com/joho/godotenv"
@@ -33,7 +33,7 @@ type PoolConfig struct {
 
 // Engine config
 type EngineConfig struct {
-	DefaultLimits *uttt.Limits // Default limits struct for the engine
+	DefaultLimits *mcts.Limits // Default limits struct for the engine
 	MaxDepth      int
 	MaxMovetime   int // In milliseconds (10000 ms by default)
 	MaxSizeMb     int // maximum size of the tree in mb
@@ -65,7 +65,7 @@ func LoadConfig() {
 			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 30*time.Second),
 		},
 		Engine: EngineConfig{
-			DefaultLimits: uttt.DefaultLimits(),
+			DefaultLimits: mcts.DefaultLimits(),
 			MaxDepth:      utils.GetEnvInt("MAX_DEPTH", 20),
 			MaxMovetime:   utils.GetEnvInt("MAX_MOVETIME", 20000),
 			MaxSizeMb:     utils.GetEnvInt("MAX_TREE_SIZE_MB", 16),

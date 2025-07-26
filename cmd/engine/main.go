@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"unsafe"
 	uttt "uttt/internal/engine"
+	"uttt/internal/mcts"
 )
 
 func main() {
@@ -15,33 +18,34 @@ func main() {
 	// mcts := uttt.NewUtttMCTS(*pos)
 	// mcts.SetLimits(*uttt.DefaultLimits().SetThreads(4).SetMbSize(32))
 	// mcts.Search()
-	// engine := uttt.NewEngine()
-	// engine.SetLimits(*uttt.DefaultLimits().SetThreads(4).SetMbSize(4))
-	// fmt.Println(engine.Think(false))
-	// mcts := engine.Mcts()
+	engine := uttt.NewEngine()
+	engine.SetLimits(mcts.DefaultLimits().SetThreads(8).SetMbSize(32))
+	fmt.Println(engine.Think(false))
+	tree := engine.Mcts()
 
-	// fmt.Printf("Tree size=%d (count=%d)\n", mcts.Size(), mcts.Count())
+	size, count, nodesize := tree.Size(), tree.Count(), uint32(unsafe.Sizeof(uttt.UtttNode{}))
+	fmt.Printf("Tree size=%d - %d bytes (count=%d - %d bytes)\n", size, size*nodesize, count, count*int(nodesize))
 
-	// bestchild := mcts.BestChild(mcts.Root(), uttt.BestChildWinRate)
-	// children := mcts.Root().Children
-	// for i := range len(children) {
-	// 	node := &children[i]
-	// 	fmt.Printf("\t%d. %s w=%d/v=%d (wr=%.2f) (lr=%.2f) (dr=%.2f)",
-	// 		i+1, node.NodeSignature, node.Wins, node.Visits,
-	// 		float64(node.Wins)/float64(node.Visits),
-	// 		float64(node.Losses)/float64(node.Visits),
-	// 		float64(node.Visits-int32(node.Wins)-int32(node.Losses))/float64(node.Visits),
-	// 	)
+	bestchild := tree.BestChild(tree.Root, mcts.BestChildWinRate)
+	children := tree.Root.Children
+	for i := range len(children) {
+		node := &children[i]
+		fmt.Printf("\t%d. %s w=%d/v=%d (wr=%.2f) (lr=%.2f) (dr=%.2f)",
+			i+1, node.NodeSignature, node.Wins, node.Visits,
+			float64(node.Wins)/float64(node.Visits),
+			float64(node.Losses)/float64(node.Visits),
+			float64(node.Visits-int32(node.Wins)-int32(node.Losses))/float64(node.Visits),
+		)
 
-	// 	if bestchild != nil && children[i].NodeSignature == bestchild.NodeSignature {
-	// 		fmt.Println(" (best)")
-	// 	} else {
-	// 		fmt.Println()
-	// 	}
-	// }
+		if bestchild != nil && children[i].NodeSignature == bestchild.NodeSignature {
+			fmt.Println(" (best)")
+		} else {
+			fmt.Println()
+		}
+	}
 
-	// fmt.Println(mcts.SearchResult())
+	fmt.Println(tree.SearchResult())
 
-	cli := uttt.NewCli()
-	cli.Start()
+	// cli := uttt.NewCli()
+	// cli.Start()
 }

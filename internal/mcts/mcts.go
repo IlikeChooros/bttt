@@ -1,10 +1,11 @@
-package uttt
+package mcts
 
 import (
 	"fmt"
 	"math"
 	"sync"
 	"sync/atomic"
+	"unsafe"
 )
 
 // Generalized Monte-Carlo Tree Search algorithm
@@ -18,6 +19,8 @@ type Result int
 
 type BestChildPolicy int
 
+var ExplorationParam float64 = 0.55
+
 const (
 	BestChildMostVisits BestChildPolicy = iota
 	BestChildWinRate
@@ -28,12 +31,8 @@ const (
 // since the search may be multi-threaded (tree parallelized)
 type SelectionPolicy[T comparable] func(parent *NodeBase[T]) *NodeBase[T]
 
-const (
-	explorationParam = 0.55
-)
-
 // Default selection of the node policy (with ucb 1 value)
-func DefaultSelection(node *NodeBase[PosType]) *NodeBase[PosType] {
+func DefaultSelection[T comparable](node *NodeBase[T]) *NodeBase[T] {
 
 	// Is that's a terminal node, simply return itself, there is no children anyway
 	// and on the rollout we will exit early, since the position is terminated
@@ -59,7 +58,7 @@ func DefaultSelection(node *NodeBase[PosType]) *NodeBase[PosType] {
 
 		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
 		ucb := float64(wins)/float64(visits) +
-			explorationParam*math.Sqrt(math.Log(float64(parent_visits))/float64(visits))
+			ExplorationParam*math.Sqrt(math.Log(float64(parent_visits))/float64(visits))
 
 		if ucb > max {
 			max = ucb
@@ -121,7 +120,7 @@ func TerminalFlag(terminal bool) GameFlags {
 
 type GameOperations[T comparable] interface {
 	// Generate moves here, and add them as children to given node
-	ExpandNode(*NodeBase[T]) uint64
+	ExpandNode(*NodeBase[T]) uint32
 	// Make a move on the internal position definition, with given
 	// signature value (move)
 	Traverse(T)
@@ -144,12 +143,10 @@ type TreeStats struct {
 
 type MCTS[T comparable] struct {
 	TreeStats
-	stop             atomic.Bool
-	limits           *Limits
-	timer            *_Timer
+	Limiter          LimiterLike
 	selection_policy SelectionPolicy[T]
-	root             *NodeBase[T]
-	size             atomic.Uint64
+	Root             *NodeBase[T]
+	size             atomic.Uint32
 	wg               sync.WaitGroup
 }
 
@@ -160,23 +157,23 @@ func NewMTCS[T comparable](
 ) *MCTS[T] {
 	mcts := &MCTS[T]{
 		TreeStats:        TreeStats{},
-		limits:           DefaultLimits(),
-		timer:            _NewTimer(),
+		Limiter:          LimiterLike(NewLimiter(uint32(unsafe.Sizeof(NodeBase[T]{})))),
 		selection_policy: selectionPolicy,
-		root:             &NodeBase[T]{GameFlags: flags},
+		Root:             &NodeBase[T]{GameFlags: flags},
 	}
 
-	mcts.root.state.Store(2)
-	mcts.size.Store(1 + operations.ExpandNode(mcts.root))
+	mcts.Limiter.Stop()
+	mcts.Root.state.Store(2)
+	mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
 	return mcts
 }
 
 func (mcts *MCTS[T]) IsThinking() bool {
-	return !mcts.stop.Load()
+	return !mcts.Limiter.Stop()
 }
 
 func (mcts *MCTS[T]) Stop() {
-	mcts.stop.Store(true)
+	mcts.Limiter.SetStop(true)
 }
 
 func (mcts *MCTS[T]) MaxDepth() int {
@@ -191,14 +188,18 @@ func (mcts *MCTS[T]) Nodes() uint32 {
 	return mcts.nodes.Load()
 }
 
-func (mcts *MCTS[T]) SetLimits(limits Limits) {
-	*mcts.limits = limits
+func (mcts *MCTS[T]) SetLimits(limits *Limits) {
+	mcts.Limiter.SetLimits(limits)
+}
+
+func (mcts *MCTS[T]) Limits() *Limits {
+	return mcts.Limiter.Limits()
 }
 
 func (mcts *MCTS[T]) String() string {
 	str := fmt.Sprintf("MCTS={Size=%d, Stats:{MaxDepth=%d, Nps=%d, Nodes=%d}, Stop=%v",
-		mcts.Size(), mcts.MaxDepth(), mcts.Nps(), mcts.Nodes(), mcts.stop.Load())
-	str += fmt.Sprintf(", Root=%v, Root.Children=%v", mcts.root, mcts.root.Children)
+		mcts.Size(), mcts.MaxDepth(), mcts.Nps(), mcts.Nodes(), !mcts.IsThinking())
+	str += fmt.Sprintf(", Root=%v, Root.Children=%v", mcts.Root, mcts.Root.Children)
 	return str
 }
 
@@ -218,13 +219,13 @@ func countTreeNodes[T comparable](node *NodeBase[T]) int {
 
 // Get the size of the tree (by counting)
 func (mcts *MCTS[T]) Count() int {
-	return countTreeNodes(mcts.root)
+	return countTreeNodes(mcts.Root)
 }
 
 // Get the size of the tree
-func (mcts *MCTS[T]) Size() int {
+func (mcts *MCTS[T]) Size() uint32 {
 	// Count every node in the tree
-	return int(mcts.size.Load())
+	return mcts.size.Load()
 }
 
 // Remove previous tree
@@ -237,19 +238,20 @@ func (mcts *MCTS[T]) Reset(ops GameOperations[T], turn, isTerminated bool) {
 
 	// Make new root
 	var signatureNull T
-	mcts.root = NewBaseNode(nil, signatureNull, isTerminated)
+	mcts.Root = NewBaseNode(nil, signatureNull, isTerminated)
 	mcts.size.Store(1)
+	mcts.Root.state.Store(2)
 
 	if !isTerminated {
-		mcts.size.Add(ops.ExpandNode(mcts.root))
+		mcts.size.Add(ops.ExpandNode(mcts.Root))
 	}
 }
 
 // Select new root (play given move on the board, and update the tree)
 func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	index := -1
-	for i := range mcts.root.Children {
-		if mcts.root.Children[i].NodeSignature == signature {
+	for i := range mcts.Root.Children {
+		if mcts.Root.Children[i].NodeSignature == signature {
 			index = i
 		}
 	}
@@ -259,7 +261,7 @@ func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 	}
 
 	// Create a completely new node to avoid any lingering references
-	selectedChild := &mcts.root.Children[index]
+	selectedChild := &mcts.Root.Children[index]
 	newRoot := &NodeBase[T]{
 		NodeStats:     selectedChild.NodeStats,
 		NodeSignature: selectedChild.NodeSignature,
@@ -273,20 +275,16 @@ func (mcts *MCTS[T]) MakeRoot(signature T) bool {
 		newRoot.Children[i].Parent = newRoot
 	}
 
-	mcts.root = newRoot
+	mcts.Root = newRoot
 
 	// Update the counters
-	mcts.size.Store(uint64(mcts.Count()))
+	mcts.size.Store(uint32(mcts.Count()))
 	return true
-}
-
-func (mcts *MCTS[T]) Root() *NodeBase[T] {
-	return mcts.root
 }
 
 func (mcts *MCTS[T]) RootSignature() T {
 	var signature T
-	if bestChild := mcts.BestChild(mcts.root, BestChildWinRate); bestChild != nil {
+	if bestChild := mcts.BestChild(mcts.Root, BestChildWinRate); bestChild != nil {
 		signature = bestChild.NodeSignature
 	}
 	return signature
@@ -353,12 +351,12 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 // Get the principal variation (ie. the best sequence of moves)
 // based on given best child policy
 func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]*NodeBase[T], bool) {
-	if mcts.root == nil {
+	if mcts.Root == nil {
 		return nil, false
 	}
 
 	pv := make([]*NodeBase[T], 0, mcts.MaxDepth())
-	node := mcts.root
+	node := mcts.Root
 	mate := false
 
 	// Simply select 'best child' until we don't have any children

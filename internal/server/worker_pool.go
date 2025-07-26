@@ -139,7 +139,7 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 	}
 
 	// Set the limits
-	limits := *DefaultConfig.Engine.DefaultLimits
+	limits := DefaultConfig.Engine.DefaultLimits
 	if req.Movetime > 0 {
 		limits.SetMovetime(min(req.Movetime, DefaultConfig.Engine.MaxMovetime))
 	}

@@ -90,7 +90,7 @@ PASS
 ok      uttt/internal/engine    2.368s
 ```
 
-*(Added BenchmarkNotationLoad, to see how time in the 'GeneratMoves' we use to load the position)*
+*(Added BenchmarkNotationLoad, to see how much time in the 'GeneratMoves' we use to load the position)*
 Current perft results:
 perft 10: `Nodes: 18466787808 (112.0 Mnps)`
 
@@ -112,10 +112,22 @@ I have tried:
 # New approach
 - [x] Use monte carlo tree search (MCTS) instead of alpha-beta pruning
 - [x] Support multi-threading
-- [ ] Proper pv support:
-  - [ ] Working for maximizing player (or for the player whose turn is set to 1)
+- [x] Proper pv support:
+  - [x] Working for maximizing player (or for the player whose turn is set to 1)
+  - Simply minimizing the opponent's score (choosing the node with the lowest wr), and always choosing to terminate the position (since that's always the winning move)
 - [ ] Add channels to set the engine results
-- [ ] Add turn to the nodes, since this algorithm is used for zero-sum games anyway
+  - Use ticks to set the engine results, for example on each max depth increase 
+- [x] Add turn to the nodes, since this algorithm is used for zero-sum games anyway
+  - Yea no need for that
+- [ ] Better limits support (maximize the search, to provide the best experience for the user)
+  - [ ] Time limit + memory limit
+    - When we use up all memory, we should stop expanding the tree, and just keep making the rollouts
+  - [ ] Depth limit
+    - Simply wait until the pv is same depth as the depth limit, and then return
+  - Depth + time is natural, but in case of depth + memory, we should immediately stop the search, since we can get into a deadlock
+- Maybe add interface for the mcts, that updates the search statistics, make 2 default implementations:
+  - One that silently updates them
+  - The other that also prints them to the console
 
 # Server
 

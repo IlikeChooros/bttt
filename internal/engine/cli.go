@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"uttt/internal/mcts"
 )
 
 type Cli struct {
@@ -215,7 +216,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 	}
 
 	// Parse the search commands
-	limits := DefaultLimits()
+	limits := mcts.DefaultLimits()
 	var err error
 	for i := 0; i < len(tokens); i++ {
 
@@ -224,6 +225,11 @@ func (cli *Cli) handleGo(tokens []string) error {
 		}
 
 		switch tokens[i] {
+		case "mbsize":
+			err = _parseIntToken(i+1, tokens, func(mbsize int) {
+				limits.SetMbSize(mbsize)
+				i++
+			})
 		case "depth":
 			// Next token should be an integer value
 			err = _parseIntToken(i+1, tokens, func(depth int) {
@@ -232,7 +238,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 			})
 		case "nodes":
 			err = _parseIntToken(i+1, tokens, func(nodes int) {
-				limits.SetNodes(uint64(nodes))
+				limits.SetNodes(uint32(nodes))
 				i++
 			})
 		case "movetime":
@@ -250,7 +256,8 @@ func (cli *Cli) handleGo(tokens []string) error {
 
 	// Run the engine
 	if err == nil {
-		cli.engine.SetLimits(*limits)
+		cli.engine.SetLimits(limits)
+		cli.engine.NewGame()
 		results := cli.engine.Think(true)
 		fmt.Println("info", results)
 	}
