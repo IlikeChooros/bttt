@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -14,6 +15,8 @@ func AnalysisHandler(workerPool *WorkerPool) http.HandlerFunc {
 			http.Error(w, "Invalid JSON", http.StatusBadRequest)
 			return
 		}
+
+		fmt.Println("req=", req)
 
 		req.Response = make(chan AnalysisResponse, 1)
 

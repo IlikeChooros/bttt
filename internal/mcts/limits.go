@@ -1,7 +1,9 @@
 package mcts
 
 import (
+	"encoding/json"
 	"math"
+	"strings"
 )
 
 type Limits struct {
@@ -11,6 +13,12 @@ type Limits struct {
 	Infinite bool
 	NThreads int
 	ByteSize int64
+}
+
+func (l Limits) String() string {
+	builder := strings.Builder{}
+	_ = json.NewEncoder(&builder).Encode(l)
+	return builder.String()
 }
 
 const (

@@ -20,10 +20,24 @@ func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 				// }
 
 				// Standard log
+				// if  r.Method == "POST" {
+				// 	data, err := io.ReadAll(body)
+				// 	if err != nil {
+				// 		logger.Error("Cannot read post data!")
+				// 		return
+				// 	}
+
+				// 	logger.Info(
+				// 		r.UserAgent(), r.Method, r.URL.Path,
+				// 		r.RemoteAddr, GetRequestIPAddress(r),
+				// 		"data", data,
+				// 	)
+				// } else {
 				logger.Info(
 					r.UserAgent(), r.Method, r.URL.Path,
 					r.RemoteAddr, GetRequestIPAddress(r),
 				)
+				// }
 			}()
 
 			next.ServeHTTP(w, r)

@@ -45,6 +45,7 @@ func main() {
 
 	// API endpoints
 	router.HandleFunc("/analysis", server.AnalysisHandler(workerPool))
+	router.HandleFunc("/limits", server.LimitsHandler())           // get current engine limits for the frontend
 	router.HandleFunc("/health", server.HealthHandler(workerPool)) // more in-depth health of the server
 	router.HandleFunc("/healthz", server.HealthzHandler())         // either 204 or 503 response
 	router.HandleFunc("/metrics", server.MetricsHandler())         // memory usage, pool usage and other stats

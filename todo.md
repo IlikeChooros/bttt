@@ -129,6 +129,11 @@ I have tried:
   - One that silently updates them
   - The other that also prints them to the console
 
+### Notes
+Engine is still kinda weak, it looks like it can detect mates, but it can't really 
+avoid them: Maybe rewrite the 'mating' detection in pv, so that only the enemy will
+always choose to make the terminating move
+
 # Server
 
 TODO:

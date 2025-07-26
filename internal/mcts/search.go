@@ -29,6 +29,8 @@ func (mcts *MCTS[T]) setupSearch() {
 	// mcts.timer.Reset()
 	mcts.Limiter.Reset()
 	mcts.nodes.Store(0)
+	mcts.nps.Store(0)
+	mcts.maxdepth.Store(0)
 	// mcts.stop.Store(false)
 }
 
@@ -47,12 +49,6 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 	if mcts.Root.Terminal() {
 		return
 	}
-
-	// there is no computer with 18 446 744 073 giga bytes of memory anyway
-	// var maxcount uint32 = math.MaxUint32
-	// if !mcts.Limiter.Limits.InfiniteSize() {
-	// 	maxcount = uint32(mcts.Limiter.Limits.ByteSize) / (uint32(unsafe.Sizeof(*mcts.Root)))
-	// }
 
 	var node *NodeBase[T]
 

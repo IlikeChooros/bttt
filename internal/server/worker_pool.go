@@ -2,10 +2,13 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 	uttt "uttt/internal/engine"
+	"uttt/internal/mcts"
 )
 
 type AnalysisResponse struct {
@@ -17,10 +20,20 @@ type AnalysisResponse struct {
 }
 
 type AnalysisRequest struct {
-	Position string `json:"position"`
-	Movetime int    `json:"movetime"`
-	Depth    int    `json:"depth"`
-	Response chan AnalysisResponse
+	Position string                `json:"position"`
+	Movetime int                   `json:"movetime"`
+	Depth    int                   `json:"depth"`
+	Threads  int                   `json:"threads"`
+	SizeMb   int                   `json:"sizemb"`
+	Response chan AnalysisResponse `json:"-"`
+}
+
+func (r AnalysisRequest) String() string {
+	builder := strings.Builder{}
+	if err := json.NewEncoder(&builder).Encode(r); err != nil {
+		return "error"
+	}
+	return builder.String()
 }
 
 type WorkerPool struct {
@@ -45,9 +58,9 @@ func NewWorkerPool(workers int, queueSize int) *WorkerPool {
 
 // Start the worker pool, submit new requests with `Submit` method
 func (wp *WorkerPool) Start(ctx context.Context) {
-	for range wp.workers {
+	for i := range wp.workers {
 		wp.wg.Add(1)
-		go wp.worker(ctx)
+		go wp.worker(i, ctx)
 	}
 }
 
@@ -84,7 +97,7 @@ func (wp *WorkerPool) RefusedJobs() int64 {
 	return wp.refusedJobs.Load()
 }
 
-func (wp *WorkerPool) worker(ctx context.Context) {
+func (wp *WorkerPool) worker(id int, ctx context.Context) {
 	// Main worker thread
 	defer wp.wg.Done()
 
@@ -94,6 +107,7 @@ func (wp *WorkerPool) worker(ctx context.Context) {
 	for {
 		select {
 		case req := <-wp.jobQueue:
+			// fmt.Println("Processing by", id)
 			wp.processJobWithMetrics(engine, req)
 		case <-ctx.Done():
 			return
@@ -113,6 +127,29 @@ func searchTimeout(done chan bool, engine *uttt.Engine) {
 	}
 }
 
+func getAnalysisLimits(req AnalysisRequest) *mcts.Limits {
+	limits := mcts.DefaultLimits()
+	*limits = DefaultConfig.Engine.DefaultLimits
+
+	if req.Movetime > 0 {
+		limits.SetMovetime(min(req.Movetime, DefaultConfig.Engine.MaxMovetime))
+	}
+
+	if req.Depth > 0 {
+		limits.SetDepth(min(req.Depth, DefaultConfig.Engine.MaxDepth))
+	}
+
+	if req.Threads > 0 {
+		limits.SetThreads(min(req.Threads, DefaultConfig.Engine.Threads))
+	}
+
+	if req.SizeMb > 0 {
+		limits.SetMbSize(min(req.SizeMb, DefaultConfig.Engine.MaxSizeMb))
+	}
+
+	return limits
+}
+
 // Handle engine search
 func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) AnalysisResponse {
 	// Decrement the counter
@@ -122,41 +159,33 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 	wp.pendingJobs.Add(-1)
 	wp.activeJobs.Add(1)
 
-	// Clear the search cache
-	engine.NewGame()
-
 	// Read the parameters
 	notation := uttt.StartingPosition
 	if req.Position != "" {
 		notation = req.Position
 	}
 
-	// Invalid position
-	if err := engine.Position().FromNotation(notation); err != nil {
+	// Sets new position, also resets the engine state
+	if err := engine.SetNotation(notation); err != nil {
 		return AnalysisResponse{
 			Error: "Invalid position notation",
 		}
 	}
 
-	// Set the limits
-	limits := DefaultConfig.Engine.DefaultLimits
-	if req.Movetime > 0 {
-		limits.SetMovetime(min(req.Movetime, DefaultConfig.Engine.MaxMovetime))
-	}
-
-	if req.Depth > 0 {
-		limits.SetDepth(min(req.Depth, DefaultConfig.Engine.MaxDepth))
-	}
+	// Get the limits
+	limits := getAnalysisLimits(req)
 
 	// Use here a timeout
 	searchFinished := make(chan bool)
 	go searchTimeout(searchFinished, engine)
 
 	// Search, and return the result
+	// fmt.Println("limits", *limits)
 	engine.SetLimits(limits)
-	result := engine.Think(false)
+	result := engine.Think()
 	close(searchFinished)
 
+	// fmt.Println("search-result", result)
 	// Create the pv string slice
 	pv := make([]string, engine.Pv().Size())
 	slice := engine.Pv().Slice()
