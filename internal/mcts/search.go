@@ -56,7 +56,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T]) {
 
 	var node *NodeBase[T]
 
-	for mcts.Limiter.Ok(mcts.Nodes(), mcts.Size()) {
+	for mcts.Limiter.Ok(mcts.Nodes(), mcts.Size(), uint32(mcts.MaxDepth())) {
 
 		// Choose the most promising node
 		node = mcts.Selection(ops)

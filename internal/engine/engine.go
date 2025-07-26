@@ -7,7 +7,8 @@ Main engine class, allowing user to make moves on the board,
 search best move, based on given parameteres
 */
 type Engine struct {
-	mcts *UtttMCTS
+	mcts   *UtttMCTS
+	policy mcts.BestChildPolicy
 }
 
 // Initialize the package
@@ -18,20 +19,25 @@ func Init() {
 // Get new engine instance
 func NewEngine() *Engine {
 	return &Engine{
-		mcts: NewUtttMCTS(*NewPosition()),
+		mcts:   NewUtttMCTS(*NewPosition()),
+		policy: mcts.BestChildMostVisits,
 	}
+}
+
+func (e *Engine) SetBestChildPolicy(policy mcts.BestChildPolicy) {
+	e.policy = policy
 }
 
 // Starting seraching for the bestmove
 func (e *Engine) Search() {
 	// In the future, add some setup, maybe don't use 'main' thread
-	go e.Think(true)
+	go e.Think()
 }
 
 // Search the moves, in a blocking way
-func (e *Engine) Think(print bool) SearchResult {
+func (e *Engine) Think() SearchResult {
 	e.mcts.Search()
-	return e.mcts.SearchResult()
+	return e.mcts.SearchResult(e.policy)
 }
 
 func (e *Engine) IsThinking() bool {
@@ -62,7 +68,7 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) Pv() *MoveList {
-	pv, _ := e.mcts.Pv()
+	pv, _ := e.mcts.Pv(e.policy)
 	return pv
 }
 

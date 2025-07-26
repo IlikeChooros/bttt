@@ -258,7 +258,7 @@ func (cli *Cli) handleGo(tokens []string) error {
 	if err == nil {
 		cli.engine.SetLimits(limits)
 		cli.engine.NewGame()
-		results := cli.engine.Think(true)
+		results := cli.engine.Think()
 		fmt.Println("info", results)
 	}
 

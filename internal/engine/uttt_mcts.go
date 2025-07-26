@@ -57,7 +57,7 @@ func (mcts *UtttMCTS) Ops() mcts.GameOperations[PosType] {
 }
 
 func (mcts *UtttMCTS) Reset() {
-	mcts.MCTS.Reset(&mcts.ops, bool(mcts.ops.position.Turn()), mcts.ops.position.IsTerminated())
+	mcts.MCTS.Reset(&mcts.ops, mcts.ops.position.IsTerminated())
 }
 
 // Set the position
@@ -71,8 +71,8 @@ func (mcts *UtttMCTS) SetNotation(notation string) error {
 	return mcts.ops.position.FromNotation(notation)
 }
 
-func (mcts *UtttMCTS) SearchResult() SearchResult {
-	pv, mate := mcts.Pv()
+func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
+	pv, mate := mcts.Pv(pvPolicy)
 	turn := 1
 	result := SearchResult{
 		Bestmove: mcts.RootSignature(),
@@ -108,9 +108,9 @@ func (mcts *UtttMCTS) SearchResult() SearchResult {
 	return result
 }
 
-// Get the principal variation (pv, isTerminal, lastnode)
-func (self *UtttMCTS) Pv() (*MoveList, bool) {
-	nodes, mate := self.MCTS.Pv(mcts.BestChildWinRate)
+// Get the principal variation (pv, isTerminal)
+func (self *UtttMCTS) Pv(policy mcts.BestChildPolicy) (*MoveList, bool) {
+	nodes, mate := self.MCTS.Pv(policy)
 	pv := NewMoveList()
 	for _, node := range nodes {
 		pv.AppendMove(node.NodeSignature)

@@ -229,7 +229,7 @@ func (mcts *MCTS[T]) Size() uint32 {
 }
 
 // Remove previous tree
-func (mcts *MCTS[T]) Reset(ops GameOperations[T], turn, isTerminated bool) {
+func (mcts *MCTS[T]) Reset(ops GameOperations[T], isTerminated bool) {
 	// Discard running search
 	if mcts.IsThinking() {
 		mcts.Stop()

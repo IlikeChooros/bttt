@@ -29,7 +29,7 @@ func TestMates(t *testing.T) {
 			continue
 		}
 
-		result := engine.Think(false)
+		result := engine.Think()
 
 		if result.ScoreType != MateScore {
 			t.Errorf("ScoreType=%d, want=%d (%v, pv=%v)", result.ScoreType, MateScore, result, engine.Pv())

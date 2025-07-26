@@ -19,8 +19,8 @@ func main() {
 	// mcts.SetLimits(*uttt.DefaultLimits().SetThreads(4).SetMbSize(32))
 	// mcts.Search()
 	engine := uttt.NewEngine()
-	engine.SetLimits(mcts.DefaultLimits().SetThreads(8).SetMbSize(32))
-	fmt.Println(engine.Think(false))
+	engine.SetLimits(mcts.DefaultLimits().SetThreads(8).SetDepth(9))
+	fmt.Println(engine.Think())
 	tree := engine.Mcts()
 
 	size, count, nodesize := tree.Size(), tree.Count(), uint32(unsafe.Sizeof(uttt.UtttNode{}))
@@ -43,8 +43,6 @@ func main() {
 			fmt.Println()
 		}
 	}
-
-	fmt.Println(tree.SearchResult())
 
 	// cli := uttt.NewCli()
 	// cli.Start()

@@ -120,7 +120,7 @@ I have tried:
 - [x] Add turn to the nodes, since this algorithm is used for zero-sum games anyway
   - Yea no need for that
 - [ ] Better limits support (maximize the search, to provide the best experience for the user)
-  - [ ] Time limit + memory limit
+  - [x] Time limit + memory limit
     - When we use up all memory, we should stop expanding the tree, and just keep making the rollouts
   - [ ] Depth limit
     - Simply wait until the pv is same depth as the depth limit, and then return
