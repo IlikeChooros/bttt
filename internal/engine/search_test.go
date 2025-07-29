@@ -1,6 +1,8 @@
 package uttt
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"uttt/internal/mcts"
 )
@@ -21,23 +23,25 @@ func TestMates(t *testing.T) {
 	}
 
 	engine := NewEngine()
-	engine.SetLimits(mcts.DefaultLimits().SetNodes(400))
+	engine.SetLimits(mcts.DefaultLimits().SetCycles(1000))
 
 	for i, pos := range positions {
-		if err := engine.SetNotation(pos); err != nil {
-			t.Error(err)
-			continue
-		}
+		t.Run(fmt.Sprintf("Mates-%s", strings.ReplaceAll(pos, "/", "|")), func(t *testing.T) {
+			if err := engine.SetNotation(pos); err != nil {
+				t.Error(err)
+				return
+			}
 
-		result := engine.Think()
+			result := engine.Think()
 
-		if result.ScoreType != MateScore {
-			t.Errorf("ScoreType=%d, want=%d (%v, pv=%v)", result.ScoreType, MateScore, result, engine.Pv())
-			continue
-		}
+			if result.ScoreType != MateScore {
+				t.Errorf("ScoreType=%d, want=%d (%v, pv=%v)", result.ScoreType, MateScore, result, engine.Pv())
+				return
+			}
 
-		if result.Value != mate_depths[i] {
-			t.Error("Expected other winning side, got=", result.Value, "want=", mate_depths)
-		}
+			if result.Value != mate_depths[i] {
+				t.Error("Expected other winning side, got=", result.Value, "want=", mate_depths)
+			}
+		})
 	}
 }

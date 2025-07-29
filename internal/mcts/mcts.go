@@ -2,7 +2,6 @@ package mcts
 
 import (
 	"fmt"
-	"math"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -10,16 +9,16 @@ import (
 
 // Generalized Monte-Carlo Tree Search algorithm
 
-const (
-	virtualLoss = 10
-)
+var VirtualLoss int32 = 0
 
-// Result of the rollout, either -1 (loss), 0 (draw), or 1 (win)
-type Result int
-
+// Result of the rollout, should range from [0, 1] 0 being loss from the root's perspective
+// and 1 being a win
+type Result float64
+type MoveLike comparable
 type BestChildPolicy int
 
-var ExplorationParam float64 = 0.55
+var ExplorationParam float64 = 0.75
+var threadExploration float64 = ExplorationParam // exploartion factor, but scaled up for multi-threaded search
 
 const (
 	BestChildMostVisits BestChildPolicy = iota
@@ -29,51 +28,23 @@ const (
 // Will be called, when we choose this node, as it is the most promising to expand
 // Warning: when using NodeStats fields, must use atomic operations (Load, Store)
 // since the search may be multi-threaded (tree parallelized)
-type SelectionPolicy[T comparable] func(parent *NodeBase[T]) *NodeBase[T]
+type SelectionPolicy[T MoveLike] func(parent, root *NodeBase[T]) *NodeBase[T]
 
-// Default selection of the node policy (with ucb 1 value)
-func DefaultSelection[T comparable](node *NodeBase[T]) *NodeBase[T] {
-
-	// Is that's a terminal node, simply return itself, there is no children anyway
-	// and on the rollout we will exit early, since the position is terminated
-	if node.Terminal() {
-		return node
-	}
-
-	max := float64(-1)
-	index := 0
-	parent_visits := atomic.LoadInt32(&node.Visits)
-
-	for i := 0; i < len(node.Children); i++ {
-		// Get the variables
-		visits := atomic.LoadInt32(&node.Children[i].Visits)
-
-		// Pick the unvisited one
-		if visits == 0 {
-			// Return pointer to the child
-			return &node.Children[i]
-		}
-
-		wins := atomic.LoadInt32(&node.Children[i].Wins)
-
-		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
-		ucb := float64(wins)/float64(visits) +
-			ExplorationParam*math.Sqrt(math.Log(float64(parent_visits))/float64(visits))
-
-		if ucb > max {
-			max = ucb
-			index = i
-		}
-	}
-
-	return &node.Children[index]
-}
-
-// visit/win/loss count of the node, should be accessed only with atomic operations
+// visits/virutal loss/win/loss count of the node,
+// wins, and losses should be accessed only with atomic operations
+// However to read the visit and virtual loss counts, use the methods
 type NodeStats struct {
-	Visits int32 // Incremented each time this node is on a path: selected node - root
-	Wins   int32 // From this node's perspective (not root's!), number of wins we get from this position forward
-	Losses int32 // Same as wins, but it counts number of losses
+	// This is visit counter, it cannot be read by atomic, use GetVvl() Visits() to properly read this value
+	visits int32
+
+	// Current virtual loss applied to visits, it always meets condition: visits - virtualLoss >= 0.
+	// Read this value ONLY with GetVvl() or VirtualLoss() methods
+	virtualLoss int32
+
+	outcomes Result // float64 value of compounded outcomes for this node
+
+	// Synchornizes read/write on visits, virtual loss and outcomes
+	statsMutex sync.RWMutex
 }
 
 type GameFlags uint8
@@ -83,22 +54,96 @@ const (
 	TerminalMask GameFlags = 2
 )
 
-type NodeBase[T comparable] struct {
+type NodeBase[T MoveLike] struct {
 	NodeStats
 	NodeSignature T
 	Children      []NodeBase[T]
 	Parent        *NodeBase[T]
 	GameFlags     GameFlags
-	state         atomic.Int32 // atomic flag for 'expanded'
+	state         atomic.Uint32 // atomic flag for 'expanded'
 }
 
-func NewBaseNode[T comparable](parent *NodeBase[T], signature T, terminated bool) *NodeBase[T] {
+func newRootNode[T MoveLike](terminated bool) *NodeBase[T] {
+	return &NodeBase[T]{
+		Children:  nil,
+		GameFlags: TerminalFlag(terminated),
+	}
+}
+
+func NewBaseNode[T MoveLike](parent *NodeBase[T], signature T, terminated bool) *NodeBase[T] {
 	return &NodeBase[T]{
 		NodeSignature: signature,
 		Children:      nil,
 		Parent:        parent,
-		GameFlags:     TerminalFlag(terminated),
+		GameFlags:     TerminalFlag(terminated) | ((parent.GameFlags & TurnMask) ^ TurnMask), // flip the turn
 	}
+}
+
+func (node *NodeBase[T]) AvgOutcome() Result {
+	node.statsMutex.RLock()
+	defer node.statsMutex.RUnlock()
+	return node.outcomes / Result(node.visits)
+}
+
+func (node *NodeBase[T]) Outcomes() Result {
+	node.statsMutex.RLock()
+	defer node.statsMutex.RUnlock()
+	return node.outcomes
+}
+
+func (node *NodeBase[T]) AddOutcome(result Result) {
+	node.statsMutex.Lock()
+	node.outcomes += result
+	node.statsMutex.Unlock()
+}
+
+func (node *NodeBase[T]) Visits() int32 {
+	node.statsMutex.RLock()
+	defer node.statsMutex.RUnlock()
+
+	return node.visits
+}
+
+func (node *NodeBase[T]) VirtualLoss() int32 {
+	node.statsMutex.RLock()
+	defer node.statsMutex.RUnlock()
+
+	return node.virtualLoss
+}
+
+// Get both visits and virtual loss (to avoid situtation one of them is modified)
+// returns (visits, virtual loss)
+func (node *NodeBase[T]) GetVvl() (int32, int32) {
+	node.statsMutex.RLock()
+	defer node.statsMutex.RUnlock()
+
+	return node.visits, node.virtualLoss
+}
+
+// Returns visits - virtual loss
+func (node *NodeBase[T]) RealVisits() int32 {
+	visits, virtualLoss := node.GetVvl()
+	return visits - virtualLoss
+}
+
+// Adds VirtuaLoss to both visits and virtual loss counters
+func (node *NodeBase[T]) AddVvl(visits, virtualLoss int32) {
+	node.statsMutex.Lock()
+
+	node.visits += visits
+	node.virtualLoss += virtualLoss
+
+	node.statsMutex.Unlock()
+}
+
+// Sets visits and virtual loss of this node to specified value
+func (node *NodeBase[T]) SetVvl(visits, virtualLoss int32) {
+	node.statsMutex.Lock()
+
+	node.visits = visits
+	node.virtualLoss = virtualLoss
+
+	node.statsMutex.Unlock()
 }
 
 // Reads the game flags, and return wheter the node is terminal
@@ -106,8 +151,20 @@ func (node *NodeBase[T]) Terminal() bool {
 	return node.GameFlags&TerminalMask == TerminalMask
 }
 
+func (node *NodeBase[T]) Turn() bool {
+	return node.GameFlags&TurnMask == TurnMask
+}
+
 func (node *NodeBase[T]) SetFlag(flag GameFlags) {
 	node.GameFlags |= flag
+}
+
+func TurnFlag(turn bool) GameFlags {
+	flag := GameFlags(0)
+	if turn {
+		flag |= 1
+	}
+	return flag
 }
 
 func TerminalFlag(terminal bool) GameFlags {
@@ -118,18 +175,43 @@ func TerminalFlag(terminal bool) GameFlags {
 	return flag
 }
 
-type GameOperations[T comparable] interface {
+// Same as asking if the node has chidlren
+func (node *NodeBase[T]) Expanded() bool {
+	return node.state.Load() == 2
+}
+
+// See if currenlty node is being expanded
+func (node *NodeBase[T]) Expanding() bool {
+	return node.state.Load() == 1
+}
+
+// Should be called when we want to expand this node,
+// if it's possible, sets the internal flag to 'currently expanding'
+func (node *NodeBase[T]) CanExpand() bool {
+	return node.state.CompareAndSwap(0, 1)
+}
+
+// After successful 'CanExpand' call, use this function to set
+// the state of the node to 'expanded'
+func (node *NodeBase[T]) FinishExpanding() {
+	node.state.CompareAndSwap(1, 2)
+}
+
+type GameOperations[T MoveLike] interface {
 	// Generate moves here, and add them as children to given node
-	ExpandNode(*NodeBase[T]) uint32
+	ExpandNode(parent *NodeBase[T]) uint32
 	// Make a move on the internal position definition, with given
 	// signature value (move)
 	Traverse(T)
-	// Go back up 1 time in the game tree (undo previous move, played in traverse)
+	// Go back up 1 time in the game tree (undo previous move, which was played in traverse)
 	BackTraverse()
 	// Function to make the playout, until terminal node is reached,
 	// in case of UTTT, play random moves, until we reach draw/win/loss
 	Rollout() Result
 
+	// Reset game state to current internal position, called after changing
+	// position, for example using SetNotation function in engine
+	Reset()
 	// Clone itself, without any shared memory with the other object
 	Clone() GameOperations[T]
 }
@@ -141,7 +223,7 @@ type TreeStats struct {
 	nodes    atomic.Uint32
 }
 
-type MCTS[T comparable] struct {
+type MCTS[T MoveLike] struct {
 	TreeStats
 	Limiter          LimiterLike
 	selection_policy SelectionPolicy[T]
@@ -150,7 +232,7 @@ type MCTS[T comparable] struct {
 	wg               sync.WaitGroup
 }
 
-func NewMTCS[T comparable](
+func NewMTCS[T MoveLike](
 	selectionPolicy SelectionPolicy[T],
 	operations GameOperations[T],
 	flags GameFlags,
@@ -162,6 +244,7 @@ func NewMTCS[T comparable](
 		Root:             &NodeBase[T]{GameFlags: flags},
 	}
 
+	// Set IsThinking to false
 	mcts.Limiter.Stop()
 	mcts.Root.state.Store(2)
 	mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
@@ -204,7 +287,7 @@ func (mcts *MCTS[T]) String() string {
 }
 
 // Helper function to count tree nodes
-func countTreeNodes[T comparable](node *NodeBase[T]) int {
+func countTreeNodes[T MoveLike](node *NodeBase[T]) int {
 	nodes := 1
 	for i := range node.Children {
 		if len(node.Children[i].Children) > 0 {
@@ -228,7 +311,7 @@ func (mcts *MCTS[T]) Size() uint32 {
 	return mcts.size.Load()
 }
 
-// Remove previous tree
+// Remove previous tree & update game ops state
 func (mcts *MCTS[T]) Reset(ops GameOperations[T], isTerminated bool) {
 	// Discard running search
 	if mcts.IsThinking() {
@@ -236,9 +319,9 @@ func (mcts *MCTS[T]) Reset(ops GameOperations[T], isTerminated bool) {
 		mcts.Synchronize()
 	}
 
-	// Make new root
-	var signatureNull T
-	mcts.Root = NewBaseNode(nil, signatureNull, isTerminated)
+	// Reset game state and make new root
+	ops.Reset()
+	mcts.Root = newRootNode[T](isTerminated)
 	mcts.size.Store(1)
 	mcts.Root.state.Store(2)
 
@@ -247,44 +330,9 @@ func (mcts *MCTS[T]) Reset(ops GameOperations[T], isTerminated bool) {
 	}
 }
 
-// Select new root (play given move on the board, and update the tree)
-func (mcts *MCTS[T]) MakeRoot(signature T) bool {
-	index := -1
-	for i := range mcts.Root.Children {
-		if mcts.Root.Children[i].NodeSignature == signature {
-			index = i
-		}
-	}
-
-	if index == -1 {
-		return false
-	}
-
-	// Create a completely new node to avoid any lingering references
-	selectedChild := &mcts.Root.Children[index]
-	newRoot := &NodeBase[T]{
-		NodeStats:     selectedChild.NodeStats,
-		NodeSignature: selectedChild.NodeSignature,
-		Children:      selectedChild.Children, // Keep the subtree
-		Parent:        nil,                    // No parent
-		GameFlags:     selectedChild.GameFlags,
-	}
-
-	// Update parent pointers in children
-	for i := range newRoot.Children {
-		newRoot.Children[i].Parent = newRoot
-	}
-
-	mcts.Root = newRoot
-
-	// Update the counters
-	mcts.size.Store(uint32(mcts.Count()))
-	return true
-}
-
 func (mcts *MCTS[T]) RootSignature() T {
 	var signature T
-	if bestChild := mcts.BestChild(mcts.Root, BestChildWinRate); bestChild != nil {
+	if bestChild := mcts.BestChild(mcts.Root, BestChildMostVisits); bestChild != nil {
 		signature = bestChild.NodeSignature
 	}
 	return signature
@@ -295,55 +343,68 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 	var bestChild *NodeBase[T]
 	var child *NodeBase[T]
 
+	// DEBUG
+	// rootTurn := mcts.Root.Turn()
+	// childSameAsRootTurn := mcts.Root.Turn() != node.Turn()
+	// if node.Turn() == rootTurn {
+	// 	fmt.Println("Root's turn")
+	// } else {
+	// 	fmt.Println("Enemy's turn")
+	// }
+
+	// for i := range node.Children {
+	// 	ch := &node.Children[i]
+	// 	fmt.Printf("%d. %v v=%d (wr=%.2f)\n",
+	// 		i+1, ch.NodeSignature, ch.Visits(),
+	// 		float64(ch.Outcomes())/float64(ch.Visits()),
+	// 	)
+	// }
+
 	switch policy {
 	case BestChildMostVisits:
 		maxVisits := 0
 		for i := 0; i < len(node.Children); i++ {
 			child = &node.Children[i]
-			if int(child.Visits) > maxVisits {
-				maxVisits = int(child.Visits)
+			if v := int(child.Visits()); v > maxVisits && v > 0 {
+				maxVisits = int(child.Visits())
 				bestChild = child
-			}
-			// Always a choose winning terminal node (by definition, when position terminates
-			// on opponents turn, previous player won)
-			if child.Terminal() {
-				bestChild = child
-				break
 			}
 		}
 	case BestChildWinRate:
 		// the child we choose should have at least 20% of the max visit count (from the neighbours)
-		const minVisitsThreshold = 0.2
+		const (
+			minVisitsPercentageThreshold = 0
+			minVisitsThreshold           = 10
+		)
+
 		bestWinRate := -1.0
 
 		// Get max visits out the children
 		maxVisits := 0
 		for i := 0; i < len(node.Children); i++ {
-			maxVisits = max(int(node.Children[i].Visits), maxVisits)
+			maxVisits = max(int(node.Children[i].Visits()), maxVisits)
 		}
 
 		// Go through the children
 		for i := 0; i < len(node.Children); i++ {
 			child = &node.Children[i]
-			if child.Visits > virtualLoss && child.Visits > int32(minVisitsThreshold*float64(maxVisits)) {
+			real := child.RealVisits()
+			if real > minVisitsThreshold && real > int32(minVisitsPercentageThreshold*float64(maxVisits)) {
 
-				// We choose a move that minimizes winnning changes of our opponent
-				var winRate float64 = float64(child.Losses) / float64(child.Visits)
+				// We optimize the winning chances, looking from the root's perspective
+				var winRate float64 = float64(child.Outcomes()) / float64(child.Visits())
 
 				if winRate > bestWinRate {
 					bestWinRate = winRate
 					bestChild = child
 				}
 			}
-
-			// Always choose a terminating move (meaning we terminated the position after this move
-			// which, in most board games, means we won)
-			if child.Terminal() {
-				bestChild = child
-				break
-			}
 		}
 	}
+
+	// if bestChild != nil {
+	// 	fmt.Println("Chose", bestChild.NodeSignature)
+	// }
 
 	return bestChild
 }

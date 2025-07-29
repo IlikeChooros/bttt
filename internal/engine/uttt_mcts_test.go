@@ -1,7 +1,10 @@
 package uttt
 
 import (
+	"fmt"
 	"math"
+	"math/rand"
+	"strings"
 	"testing"
 	"uttt/internal/mcts"
 )
@@ -20,8 +23,8 @@ func TestMCTSBasicFunctionality(t *testing.T) {
 		t.Error("Root node should not be nil")
 	}
 
-	if mcts.Root.Visits != 0 {
-		t.Errorf("Initial visits should be 0, got %d", mcts.Root.Visits)
+	if mcts.Root.Visits() != 0 {
+		t.Errorf("Initial visits should be 0, got %d", mcts.Root.Visits())
 	}
 
 	if mcts.Root.Children == nil {
@@ -40,9 +43,10 @@ func TestMCTSExpansion(t *testing.T) {
 
 	// Create a root node
 	root := &mcts.NodeBase[PosType]{
-		NodeStats: mcts.NodeStats{Visits: 1}, // Non-zero visits to trigger expansion
+		// Non-zero visits to trigger expansion
 		GameFlags: mcts.TerminalFlag(false),
 	}
+	root.SetVvl(0, 0)
 
 	// Test expansion
 	ops.ExpandNode(root)
@@ -104,22 +108,22 @@ func TestMCTSRollout(t *testing.T) {
 	}
 
 	for _, notation := range positions {
-		t.Run("Rollout-"+notation, func(t *testing.T) {
+		t.Run(fmt.Sprintf("Rollout-%s", strings.ReplaceAll(notation, "/", "|")), func(t *testing.T) {
 			pos := NewPosition()
 			err := pos.FromNotation(notation)
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			ops := &UtttOperations{position: *pos}
+			ops := &UtttOperations{position: *pos, random: rand.New(rand.NewSource(22))}
 			originalNotation := pos.Notation()
 
 			// Perform rollout
 			result := ops.Rollout()
 
 			// Check result is valid
-			if result < -1 || result > 1 {
-				t.Errorf("Invalid rollout result: %d", result)
+			if result < 0 || result > 1 {
+				t.Errorf("Invalid rollout result: %f", result)
 			}
 
 			// Position should be restored
@@ -138,10 +142,6 @@ func TestMCTSSelection(t *testing.T) {
 	}
 
 	mcts := NewUtttMCTS(*pos)
-
-	// Manually expand root to test selection
-	mcts.ops.ExpandNode(mcts.Root)
-	mcts.Root.Visits = 1
 
 	// Test selection with unvisited nodes
 	selected := mcts.Selection()
@@ -164,32 +164,28 @@ func TestMCTSBackpropagation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	mcts := NewUtttMCTS(*pos)
+	tree := NewUtttMCTS(*pos)
 
 	// Create a simple tree structure
-	mcts.ops.ExpandNode(mcts.Root)
-	mcts.Root.Visits = 1
+	tree.Root.SetVvl(1, 0)
 
-	child := &mcts.Root.Children[0]
+	child := &tree.Root.Children[0]
+	child.SetVvl(int32(mcts.VirtualLoss), int32(mcts.VirtualLoss))
 
 	// Test backpropagation with win
 	originalNotation := pos.Notation()
-	mcts.Backpropagate(child, 1)
+	tree.Backpropagate(child, 1)
 
 	// Check statistics
-	if child.Visits != 1 {
-		t.Errorf("Child visits should be 1, got %d", child.Visits)
+	if child.Visits() != 1 {
+		t.Errorf("Child visits should be 1, got %d", child.Visits())
 	}
-	if child.Wins != 1 {
-		t.Errorf("Child wins should be 1, got %d", child.Wins)
+	if int(child.Outcomes()) != 1 {
+		t.Errorf("Child wins should be 1, got %f", child.Outcomes())
 	}
-	if mcts.Root.Visits != 2 { // Original 1 + 1 from backprop
-		t.Errorf("Root visits should be 2, got %d", mcts.Root.Visits)
+	if tree.Root.Visits() != 2 { // Original 1 + 1 from backprop
+		t.Errorf("Root visits should be 2, got %d", tree.Root.Visits())
 	}
-	if mcts.Root.Losses != 1 { // Should be negated for parent
-		t.Errorf("Root losses should be 1, got %d", mcts.Root.Losses)
-	}
-
 	// Position should be restored
 	if pos.Notation() != originalNotation {
 		t.Error("Position not restored after backpropagation")
@@ -213,7 +209,7 @@ func TestMCTSSearch(t *testing.T) {
 	mcts.Search()
 
 	// Check that search actually ran
-	if mcts.Root.Visits == 0 {
+	if mcts.Root.Visits() == 0 {
 		t.Error("Root should have been visited during search")
 	}
 
@@ -259,75 +255,38 @@ func TestMCTSBestChild(t *testing.T) {
 	}
 }
 
-func TestMCTSMakeRoot(t *testing.T) {
-	pos := NewPosition()
-	err := pos.FromNotation(StartingPosition)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mcts := NewUtttMCTS(*pos)
-
-	// Run search to build tree
-	mcts.Limits().SetMovetime(100)
-	mcts.Search()
-
-	if len(mcts.Root.Children) == 0 {
-		t.Fatal("Root should have children after search")
-	}
-
-	// Get a move to make root
-	moveToMake := mcts.Root.Children[0].NodeSignature
-	// oldRootVisits := mcts.Root.Visits
-
-	// Make root
-	success := mcts.MakeRoot(moveToMake)
-	if !success {
-		t.Error("MakeRoot should succeed with valid move")
-	}
-
-	// Check new root
-	if mcts.Root.NodeSignature != moveToMake {
-		t.Error("New root should have the correct move signature")
-	}
-
-	if mcts.Root.Parent != nil {
-		t.Error("New root should have nil parent")
-	}
-
-	// Test with invalid move
-	invalidMove := PosIllegal
-	success = mcts.MakeRoot(invalidMove)
-	if success {
-		t.Error("MakeRoot should fail with invalid move")
-	}
-}
-
 func TestMCTSUCB1Calculation(t *testing.T) {
 	// Create mock nodes to test UCB1
 	parent := &mcts.NodeBase[PosType]{
-		NodeStats: mcts.NodeStats{Visits: 100},
+		NodeStats: mcts.NodeStats{},
 	}
+	parent.SetVvl(100, 0)
 
 	children := []mcts.NodeBase[PosType]{
-		{NodeStats: mcts.NodeStats{Visits: 10, Wins: 7}, Parent: parent},
-		{NodeStats: mcts.NodeStats{Visits: 5, Wins: 2}, Parent: parent},
-		{NodeStats: mcts.NodeStats{Visits: 0}, Parent: parent}, // Unvisited
+		{NodeStats: mcts.NodeStats{}, Parent: parent},
+		{NodeStats: mcts.NodeStats{}, Parent: parent},
+		{NodeStats: mcts.NodeStats{}, Parent: parent}, // Unvisited
 	}
+
+	children[0].SetVvl(10, 0)
+	children[0].AddOutcome(7.0)
+	children[1].SetVvl(8, 0)
+	children[1].AddOutcome(3.0)
+	children[2].SetVvl(0, 0)
 
 	parent.Children = children
 
 	// Test selection policy
-	selected := mcts.DefaultSelection(parent)
+	selected := mcts.UCB1(parent, parent)
 
 	// Should select unvisited node
-	if selected.Visits != 0 {
-		t.Error("Should select unvisited node first")
+	if selected.Visits() != 0 {
+		t.Error("Should select unvisited node first, picked:", selected)
 	}
 
 	// Remove unvisited node and test UCB1
 	parent.Children = children[:2]
-	selected = mcts.DefaultSelection(parent)
+	selected = mcts.UCB1(parent, parent)
 
 	// Verify UCB1 calculation makes sense
 	if selected == nil {
@@ -337,9 +296,9 @@ func TestMCTSUCB1Calculation(t *testing.T) {
 	// Both nodes should have reasonable UCB1 values
 	for i := range parent.Children {
 		node := &parent.Children[i]
-		if node.Visits > 0 {
-			winRate := float64(node.Wins) / float64(node.Visits)
-			exploration := mcts.ExplorationParam * math.Sqrt(math.Log(float64(parent.Visits))/float64(node.Visits))
+		if node.Visits() > 0 {
+			winRate := float64(node.Outcomes()) / float64(node.Visits())
+			exploration := mcts.ExplorationParam * math.Sqrt(math.Log(float64(parent.Visits()))/float64(node.Visits()))
 			ucb1 := winRate + exploration
 
 			if math.IsNaN(ucb1) || math.IsInf(ucb1, 0) {
@@ -378,7 +337,7 @@ func TestMCTSMultiThreadedSearch(t *testing.T) {
 	}
 
 	engine := NewUtttMCTS(*pos)
-	engine.Limits().SetThreads(4).SetMovetime(200)
+	engine.Limits().SetThreads(4).SetNodes(20000)
 	engine.Search()
 
 	result := engine.SearchResult(mcts.BestChildWinRate)

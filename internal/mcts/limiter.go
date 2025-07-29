@@ -22,16 +22,17 @@ type LimiterLike interface {
 	// Wheter the tree can grow
 	Expand() bool
 	// Wheter the search should stop, called in the main search loop
-	Ok(nodes, size, depth uint32) bool
+	Ok(nodes, size, depth, cycles uint32) bool
 }
 
 type Limiter struct {
-	limits   *Limits
-	Timer    *_Timer
-	nodeSize uint32
-	maxSize  uint32
-	expand   atomic.Bool
-	stop     atomic.Bool
+	limits     *Limits
+	Timer      *_Timer
+	nodeSize   uint32
+	maxSize    uint32
+	expand     atomic.Bool
+	stop       atomic.Bool
+	areSetMask int
 }
 
 func NewLimiter(nodesize uint32) *Limiter {
@@ -77,6 +78,13 @@ func (l *Limiter) Reset() {
 	} else {
 		l.maxSize = math.MaxUint32
 	}
+
+	// Pre-calculate 'are set' limit mask, see 'Ok' method for more explanation
+	l.areSetMask = toMask(l.Timer.IsSet(), 1) |
+		toMask(l.limits.Nodes != DefaultNodeLimit, 2) |
+		toMask(l.limits.ByteSize != DefaultByteSizeLimit, 3) |
+		toMask(l.limits.Depth != DefaultDepthLimit, 4) |
+		toMask(l.limits.Cycles != DefaultCyclesLimit, 5)
 }
 
 func (l *Limiter) Expand() bool {
@@ -87,7 +95,7 @@ func toMask(val bool, offset int) int {
 	return int(*(*byte)(unsafe.Pointer(&val))) << offset
 }
 
-func (l *Limiter) Ok(nodes, size, depth uint32) bool {
+func (l *Limiter) Ok(nodes, size, depth, cycles uint32) bool {
 	// return !l.stop.Load() && nodes < l.limits.Nodes && !l.Timer.IsEnd() && size < l.maxSize
 	stop := l.stop.Load()
 	if l.limits.Infinite {
@@ -101,6 +109,7 @@ func (l *Limiter) Ok(nodes, size, depth uint32) bool {
 		NodesMask  = 4
 		MemoryMask = 8
 		DepthMask  = 16
+		CyclesMask = 32
 	)
 
 	limitMask |= toMask(stop, 0)
@@ -108,11 +117,7 @@ func (l *Limiter) Ok(nodes, size, depth uint32) bool {
 	limitMask |= toMask(l.limits.Nodes <= nodes, 2)
 	limitMask |= toMask(l.maxSize <= size, 3)
 	limitMask |= toMask(l.limits.Depth <= int(depth), 4)
-
-	areSet := toMask(l.Timer.IsSet(), 1) |
-		toMask(l.limits.Nodes != DefaultNodeLimit, 2) |
-		toMask(l.limits.ByteSize != DefaultByteSizeLimit, 3) |
-		toMask(l.limits.Depth != DefaultDepthLimit, 4)
+	limitMask |= toMask(l.limits.Cycles <= cycles, 5)
 
 	// Hierachy of stop signals
 	// 1. stop
@@ -121,9 +126,9 @@ func (l *Limiter) Ok(nodes, size, depth uint32) bool {
 	// 4. Depth
 
 	// Check the combos:
-	// (Time/Node or Time + Node) AND memory limit -> if memory is exhausted, disable expanding of the tree
-	// and wait for the other limitation/s
-	if (areSet&MemoryMask) == MemoryMask && (areSet&(TimeMask|NodesMask)) != 0 {
+	// (Time/Node/Cycles or any combination of them) AND memory limit ->
+	// if memory is exhausted, disable expanding of the tree and wait for the other limitation/s
+	if (l.areSetMask&MemoryMask) == MemoryMask && (l.areSetMask&(TimeMask|NodesMask|CyclesMask)) != 0 {
 		// Memory exhausted
 		if limitMask&MemoryMask == MemoryMask {
 			l.expand.Store(false)

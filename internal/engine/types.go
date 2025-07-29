@@ -30,18 +30,21 @@ type SearchResult struct {
 	Nodes     uint64
 	Nps       uint64
 	Depth     int
+	Cycles    int32
 	Pv        MoveList
 }
 
 func (s SearchResult) String() string {
-	return fmt.Sprintf("eval %s depth %d nps %d nodes %d pv %s",
-		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Pv.String())
+	return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %s",
+		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Pv.String())
 }
 
 // Get the string representation of the value
 func (s SearchResult) StringValue() string {
 	if s.ScoreType == MateScore {
 		return fmt.Sprintf("%dM", s.Value)
+	} else if s.Value == -1 {
+		return "0.00"
 	}
 	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
 }

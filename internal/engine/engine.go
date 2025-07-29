@@ -1,6 +1,9 @@
 package uttt
 
-import "uttt/internal/mcts"
+import (
+	"fmt"
+	"uttt/internal/mcts"
+)
 
 /*
 Main engine class, allowing user to make moves on the board,
@@ -36,6 +39,7 @@ func (e *Engine) Search() {
 
 // Search the moves, in a blocking way
 func (e *Engine) Think() SearchResult {
+	fmt.Printf("Limits: %v", *e.mcts.Limits())
 	e.mcts.Search()
 	return e.mcts.SearchResult(e.policy)
 }
@@ -68,7 +72,7 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) Pv() *MoveList {
-	pv, _ := e.mcts.Pv(e.policy)
+	pv, _, _ := e.mcts.Pv(e.policy)
 	return pv
 }
 

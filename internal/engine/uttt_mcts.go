@@ -2,24 +2,24 @@ package uttt
 
 import (
 	"math/rand"
-	"sync/atomic"
+	"time"
 	"uttt/internal/mcts"
 )
 
 // Actual UTTT mcts implementation
 type UtttMCTS struct {
 	mcts.MCTS[PosType]
-	ops UtttOperations
+	ops *UtttOperations
 }
 
 type UtttNode mcts.NodeBase[PosType]
 
 func NewUtttMCTS(position Position) *UtttMCTS {
-	uttt_ops := UtttOperations{position: position}
-	ops := mcts.GameOperations[PosType](&uttt_ops)
+	uttt_ops := newUtttOps(position)
+	ops := mcts.GameOperations[PosType](uttt_ops)
 	tree := &UtttMCTS{
 		MCTS: *mcts.NewMTCS(
-			mcts.DefaultSelection,
+			mcts.UCB1,
 			ops,
 			mcts.TerminalFlag(position.IsTerminated()),
 		),
@@ -29,14 +29,14 @@ func NewUtttMCTS(position Position) *UtttMCTS {
 }
 
 func (mcts *UtttMCTS) AsyncSearch() {
-	mcts.MCTS.SearchMultiThreaded(&mcts.ops)
+	mcts.MCTS.SearchMultiThreaded(mcts.ops)
 }
 
 // Start the search
 func (mcts *UtttMCTS) Search() {
 
 	// Run the search
-	mcts.SearchMultiThreaded(&mcts.ops)
+	mcts.SearchMultiThreaded(mcts.ops)
 
 	// Wait for the search to end
 	mcts.Synchronize()
@@ -44,20 +44,20 @@ func (mcts *UtttMCTS) Search() {
 
 // Default selection
 func (mcts *UtttMCTS) Selection() *mcts.NodeBase[PosType] {
-	return mcts.MCTS.Selection(&mcts.ops)
+	return mcts.MCTS.Selection(mcts.ops, rand.New(rand.NewSource(time.Now().UnixNano())))
 }
 
 // Default backprop
 func (mcts *UtttMCTS) Backpropagate(node *mcts.NodeBase[PosType], result mcts.Result) {
-	mcts.MCTS.Backpropagate(&mcts.ops, node, result)
+	mcts.MCTS.Backpropagate(mcts.ops, node, result)
 }
 
 func (mcts *UtttMCTS) Ops() mcts.GameOperations[PosType] {
-	return &mcts.ops
+	return mcts.ops
 }
 
 func (mcts *UtttMCTS) Reset() {
-	mcts.MCTS.Reset(&mcts.ops, mcts.ops.position.IsTerminated())
+	mcts.MCTS.Reset(mcts.ops, mcts.ops.position.IsTerminated())
 }
 
 // Set the position
@@ -72,13 +72,14 @@ func (mcts *UtttMCTS) SetNotation(notation string) error {
 }
 
 func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
-	pv, mate := mcts.Pv(pvPolicy)
+	pv, terminal, draw := mcts.Pv(pvPolicy)
 	turn := 1
 	result := SearchResult{
 		Bestmove: mcts.RootSignature(),
 		Nodes:    uint64(mcts.Nodes()),
 		Nps:      uint64(mcts.Nps()),
 		Depth:    mcts.MaxDepth(),
+		Cycles:   mcts.Root.Visits(),
 		Pv:       *pv,
 	}
 
@@ -87,39 +88,63 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 	}
 
 	// Set the score
-	if mate {
-		result.ScoreType = MateScore
-		result.Value = pv.Size() * turn
+	if terminal {
+		if draw {
+			result.ScoreType = ValueScore
+			result.Value = 0.0
+		} else {
+			result.ScoreType = MateScore
+			result.Value = pv.Size() * turn
 
-		// If the game ends on our turn, we are losing
-		if pv.Size()%2 == 0 {
-			result.Value = -result.Value
+			// If the game ends on our turn, we are losing
+			if pv.Size()%2 == 0 {
+				result.Value = -result.Value
+			}
 		}
 	} else {
-		visits := int(atomic.LoadInt32(&mcts.Root.Visits))
-		wins := int(atomic.LoadInt32(&mcts.Root.Wins))
+		visits := float64(mcts.Root.Visits())
+		wins := float64(mcts.Root.Outcomes())
 		if mcts.Root != nil && visits > 0 {
-			result.Value = 100 * wins / visits
+			result.Value = int(100 * wins / visits)
 		} else {
-			result.Value = -1
+			result.Value = -100
 		}
 	}
 
 	return result
 }
 
-// Get the principal variation (pv, isTerminal)
-func (self *UtttMCTS) Pv(policy mcts.BestChildPolicy) (*MoveList, bool) {
+// Get the principal variation (pv, mate, draw)
+func (self *UtttMCTS) Pv(policy mcts.BestChildPolicy) (*MoveList, bool, bool) {
 	nodes, mate := self.MCTS.Pv(policy)
 	pv := NewMoveList()
-	for _, node := range nodes {
+	var node *mcts.NodeBase[PosType]
+
+	for i := range nodes {
+		node = nodes[i]
 		pv.AppendMove(node.NodeSignature)
 	}
-	return pv, mate
+
+	avg := node.AvgOutcome()
+	return pv, mate, (mate && avg > 0.4 && avg < 0.6)
 }
 
 type UtttOperations struct {
 	position Position
+	rootSide TurnType
+	random   *rand.Rand
+}
+
+func newUtttOps(pos Position) *UtttOperations {
+	return &UtttOperations{
+		position: pos,
+		rootSide: pos.Turn(),
+		random:   rand.New(rand.NewSource(time.Now().UnixNano())),
+	}
+}
+
+func (ops *UtttOperations) Reset() {
+	ops.rootSide = ops.position.Turn()
 }
 
 func (ops *UtttOperations) ExpandNode(node *mcts.NodeBase[PosType]) uint32 {
@@ -150,27 +175,26 @@ func (ops *UtttOperations) BackTraverse() {
 func (ops *UtttOperations) Rollout() mcts.Result {
 	var moves *MoveList
 	var move PosType
-	var result mcts.Result = 0
+	var result mcts.Result = 0.5
 	var moveCount int = 0
-	ourSide := ops.position.Turn()
 
 	for !ops.position.IsTerminated() {
 		moveCount++
 		moves = ops.position.GenerateMoves()
 
 		// Choose at random move
-		move = moves.moves[rand.Int31n(int32(moves.size))]
+		move = moves.moves[ops.random.Int31n(int32(moves.size))]
 		ops.position.MakeMove(move)
 	}
 
 	// If that's not a draw
 	if ops.position.termination != TerminationDraw {
 		// We lost
-		if ops.position.Turn() == ourSide {
-			result = -1
+		if ops.position.Turn() == ops.rootSide {
+			result = 0
 		} else {
 			// We won
-			result = 1
+			result = 1.0
 		}
 	}
 
@@ -183,5 +207,9 @@ func (ops *UtttOperations) Rollout() mcts.Result {
 }
 
 func (ops UtttOperations) Clone() mcts.GameOperations[PosType] {
-	return mcts.GameOperations[PosType](&UtttOperations{position: ops.position.Clone()})
+	return mcts.GameOperations[PosType](&UtttOperations{
+		position: ops.position.Clone(),
+		rootSide: ops.rootSide,
+		random:   rand.New(rand.NewSource(time.Now().UnixMicro())),
+	})
 }
