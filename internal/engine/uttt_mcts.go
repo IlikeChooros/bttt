@@ -91,7 +91,7 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 	if terminal {
 		if draw {
 			result.ScoreType = ValueScore
-			result.Value = 0.0
+			result.Value = 50
 		} else {
 			result.ScoreType = MateScore
 			result.Value = pv.Size() * turn
@@ -126,7 +126,7 @@ func (self *UtttMCTS) Pv(policy mcts.BestChildPolicy) (*MoveList, bool, bool) {
 	}
 
 	avg := node.AvgOutcome()
-	return pv, mate, (mate && avg > 0.4 && avg < 0.6)
+	return pv, mate, (mate && avg == 0.5)
 }
 
 type UtttOperations struct {
@@ -177,6 +177,7 @@ func (ops *UtttOperations) Rollout() mcts.Result {
 	var move PosType
 	var result mcts.Result = 0.5
 	var moveCount int = 0
+	leafTurn := ops.position.Turn()
 
 	for !ops.position.IsTerminated() {
 		moveCount++
@@ -190,11 +191,11 @@ func (ops *UtttOperations) Rollout() mcts.Result {
 	// If that's not a draw
 	if ops.position.termination != TerminationDraw {
 		// We lost
-		if ops.position.Turn() == ops.rootSide {
-			result = 0
+		if ops.position.Turn() == leafTurn {
+			result = 1.0
 		} else {
 			// We won
-			result = 1.0
+			result = 0.0
 		}
 	}
 

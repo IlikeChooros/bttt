@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -183,6 +184,9 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 	// fmt.Println("limits", *limits)
 	engine.SetLimits(limits)
 	result := engine.Think()
+
+	// DEBUG
+	fmt.Println(result)
 	close(searchFinished)
 
 	// fmt.Println("search-result", result)

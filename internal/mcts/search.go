@@ -19,9 +19,6 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 	max := float64(-1)
 	index := 0
 	parentVisits := parent.Visits()
-
-	// If this flag is set to true, we will use children's lose rate
-	// as exploitation value
 	var child *NodeBase[T]
 
 	for i := 0; i < len(parent.Children); i++ {
@@ -37,19 +34,14 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 			return child
 		}
 
-		// If root's turn == child's turn, then we maximize the wins, else
-		// minimize the losses
 		wins := child.Outcomes()
 
 		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
 		// ucb1 = epliotation + exploration
 		// Since we assume the game is zero-sum, we want to expand the tree's nodes
-		// that have best value according to the root, meaning we want don't want to look
-		// too much at our opponents best moves, for example forced mate in 2, since there is a chance
-		// we can avoid it. If we don't, the engine will tunnel vision on opponent's best moves, discarding
-		// our winning chances, due to the specific implementation of this tree
+		// that have best value according to the root
 		ucb1 := float64(wins)/float64(visits) +
-			threadExploration*math.Sqrt(2*math.Log(float64(parentVisits))/float64(visits))
+			threadExploration*math.Sqrt(math.Log(float64(parentVisits))/float64(visits))
 
 		if ucb1 > max {
 			max = ucb1
@@ -191,9 +183,18 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand) *No
 	return node
 }
 
-// Increment the counters (wins/losses/visits) along the tree path
+// Increment the counters (wins/visits) along the tree path
 func (mcts *MCTS[T]) Backpropagate(ops GameOperations[T], node *NodeBase[T], result Result) {
-	currentResult := result
+	/*
+		source: https://en.wikipedia.org/wiki/Monte_Carlo_tree_search
+			If white loses the simulation, all nodes along the selection incremented their simulation count (the denominator),
+			but among them only the black nodes were credited with wins (the numerator). If instead white wins,
+			all nodes along the selection would still increment their simulation count, but among them
+			only the white nodes would be credited with wins. In games where draws are possible,
+			a draw causes the numerator for both black and white to be incremented by 0.5 and the denominator by 1.
+			This ensures that during selection, each player's choices expand towards the most promising moves for that player,
+			which mirrors the goal of each player to maximize the value of their move.
+	*/
 
 	for node != nil {
 
@@ -206,11 +207,11 @@ func (mcts *MCTS[T]) Backpropagate(ops GameOperations[T], node *NodeBase[T], res
 
 		// Add the outcome
 		node.AddOutcome(result)
+		result = 1.0 - result // switch the result
 
 		// Backpropagate
 		node = node.Parent
 		ops.BackTraverse()
 		mcts.nodes.Add(1)
-		currentResult = -currentResult
 	}
 }

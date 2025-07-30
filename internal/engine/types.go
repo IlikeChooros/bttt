@@ -44,7 +44,7 @@ func (s SearchResult) StringValue() string {
 	if s.ScoreType == MateScore {
 		return fmt.Sprintf("%dM", s.Value)
 	} else if s.Value == -1 {
-		return "0.00"
+		return "0.5"
 	}
 	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
 }

@@ -14,8 +14,12 @@ func main() {
 	// mcts.Search()
 	engine := uttt.NewEngine()
 	engine.SetLimits(mcts.DefaultLimits().SetThreads(4).SetDepth(13).SetMbSize(16).SetMovetime(1000))
-	engine.SetNotation("1xxx1xxx1/oo1o1xox1/oxox1x1ox/oo1x1o1oo/o1o1x2x1/o1o2ox1o/oxxx2o2/1xox1xoo1/2xxx3o o 3")
+	// engine.SetNotation("1xxx1xxx1/oo1o1xox1/oxox1x1ox/oo1x1o1oo/o1o1x2x1/o1o2ox1o/oxxx2o2/1xox1xoo1/2xxx3o o 3")
+	engine.SetNotation("xxx6/x1x6/xxx6/o3o3o/x1xoxooxo/o3o3o/ooo6/9/9 o 4")
 	fmt.Println(engine.Think())
+	// engine.Position().MakeMove(uttt.MoveFromString("A2b2"))
+	// engine.SetNotation(engine.Position().Notation())
+	// fmt.Println(engine.Think())
 
 	// tree := engine.Mcts()
 

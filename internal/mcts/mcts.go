@@ -344,21 +344,21 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 	var child *NodeBase[T]
 
 	// DEBUG
-	// rootTurn := mcts.Root.Turn()
-	// childSameAsRootTurn := mcts.Root.Turn() != node.Turn()
-	// if node.Turn() == rootTurn {
-	// 	fmt.Println("Root's turn")
-	// } else {
-	// 	fmt.Println("Enemy's turn")
-	// }
+	rootTurn := mcts.Root.Turn() == node.Turn()
+	// childSameAsRootTurn := mcts.Root.Turn() == node.Turn()
+	if rootTurn {
+		fmt.Println("Root's turn")
+	} else {
+		fmt.Println("Enemy's turn")
+	}
 
-	// for i := range node.Children {
-	// 	ch := &node.Children[i]
-	// 	fmt.Printf("%d. %v v=%d (wr=%.2f)\n",
-	// 		i+1, ch.NodeSignature, ch.Visits(),
-	// 		float64(ch.Outcomes())/float64(ch.Visits()),
-	// 	)
-	// }
+	for i := range node.Children {
+		ch := &node.Children[i]
+		fmt.Printf("%d. %v v=%d (wr=%.2f)\n",
+			i+1, ch.NodeSignature, ch.Visits(),
+			float64(ch.Outcomes())/float64(ch.Visits()),
+		)
+	}
 
 	switch policy {
 	case BestChildMostVisits:
@@ -402,9 +402,9 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 		}
 	}
 
-	// if bestChild != nil {
-	// 	fmt.Println("Chose", bestChild.NodeSignature)
-	// }
+	if bestChild != nil {
+		fmt.Println("Chose", bestChild.NodeSignature)
+	}
 
 	return bestChild
 }
