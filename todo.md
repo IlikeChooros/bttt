@@ -110,19 +110,25 @@ I have tried:
 ```
 
 # New approach
+
+### MCTS core
 - [x] Use monte carlo tree search (MCTS) instead of alpha-beta pruning
 - [x] Support multi-threading
 - [x] Proper pv support:
   - [x] Working for maximizing player (or for the player whose turn is set to 1)
   - Simply minimizing the opponent's score (choosing the node with the lowest wr), and always choosing to terminate the position (since that's always the winning move)
-- [ ] Add statistics listener interaface:
-  - Use ticks to set the engine results, for example on each max depth increase 
+- [ ] Remove hashing of the positions, since no hash table is used in MCTS 
+- [ ] Fix: In multithreaded search, 'maxdepth' may be called twice on the same depth increase
+  - Expected: Each 'depth increase' should be called only once 
+### Add-ons
+- [x] Add statistics listener interface:
+  - Use ticks to set the engine results, for example on each max depth increase
 - [x] Add turn to the nodes, since this algorithm is used for zero-sum games anyway
   - Yea no need for that
-- [ ] Better limits support (maximize the search, to provide the best experience for the user)
+- [x] Better limits support (maximize the search, to provide the best experience for the user)
   - [x] Time limit + memory limit
     - When we use up all memory, we should stop expanding the tree, and just keep making the rollouts
-  - [ ] Depth limit 
+  - [x] Depth limit 
     - Simply wait until the pv is same depth as the depth limit, and then return
   - Depth + time is natural, but in case of depth + memory, we should immediately stop the search, since we can get into a deadlock
 - Maybe add interface for the mcts, that updates the search statistics, make 2 default implementations:

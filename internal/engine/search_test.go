@@ -24,7 +24,7 @@ func TestMates(t *testing.T) {
 	}
 
 	engine := NewEngine()
-	engine.SetLimits(mcts.DefaultLimits().SetCycles(1000))
+	engine.SetLimits(mcts.DefaultLimits().SetCycles(100))
 
 	for i, pos := range positions {
 		t.Run(fmt.Sprintf("Mates-%s", strings.ReplaceAll(pos, "/", "|")), func(t *testing.T) {
@@ -37,11 +37,10 @@ func TestMates(t *testing.T) {
 
 			if result.ScoreType != MateScore {
 				t.Errorf("ScoreType=%d, want=%d (%v, pv=%v)", result.ScoreType, MateScore, result, engine.Pv())
-				return
 			}
 
 			if result.Value != mate_depths[i] {
-				t.Error("Expected other winning side, got=", result.Value, "want=", mate_depths)
+				t.Error("Expected other winning side, got=", result.Value, "want=", mate_depths[i])
 			}
 		})
 	}

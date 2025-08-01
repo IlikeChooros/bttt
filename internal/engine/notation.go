@@ -207,3 +207,30 @@ func _FromNotation(pos *Position, notation string) error {
 	pos.CheckTerminationPattern()
 	return nil
 }
+
+func ReadTurn(notation string) (TurnType, error) {
+	turnIndex := -1
+
+	for i, ch := range notation {
+		if ch == ' ' {
+			turnIndex = i + 1
+			break
+		}
+	}
+
+	if turnIndex == -1 || turnIndex >= len(notation) {
+		return CrossTurn, fmt.Errorf("Invalid notation, couldn't find turn")
+	}
+
+	var turn TurnType
+	switch notation[turnIndex] {
+	case 'o':
+		turn = CircleTurn
+	case 'x':
+		turn = CrossTurn
+	default:
+		return CrossTurn, fmt.Errorf("Notation doesn't contain valid turn indentifier")
+	}
+
+	return turn, nil
+}

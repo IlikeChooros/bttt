@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -17,16 +16,19 @@ type AnalysisResponse struct {
 	Pv    []string `json:"pv"`
 	Nps   uint64   `json:"nps"`
 	Eval  string   `json:"eval"`
+	Final bool     `json:"final"`
 	Error string   `json:"error,omitempty"`
 }
 
 type AnalysisRequest struct {
-	Position string                `json:"position"`
-	Movetime int                   `json:"movetime"`
-	Depth    int                   `json:"depth"`
-	Threads  int                   `json:"threads"`
-	SizeMb   int                   `json:"sizemb"`
-	Response chan AnalysisResponse `json:"-"`
+	Position string                           `json:"position"`
+	Movetime int                              `json:"movetime"`
+	Depth    int                              `json:"depth"`
+	Threads  int                              `json:"threads"`
+	SizeMb   int                              `json:"sizemb"`
+	Response chan AnalysisResponse            `json:"-"`
+	Listener mcts.StatsListener[uttt.PosType] `json:"-"`
+	Kill     chan bool                        `json:"-"`
 }
 
 func (r AnalysisRequest) String() string {
@@ -39,7 +41,7 @@ func (r AnalysisRequest) String() string {
 
 type WorkerPool struct {
 	workers     int
-	jobQueue    chan AnalysisRequest
+	jobQueue    chan *AnalysisRequest
 	wg          sync.WaitGroup
 	quit        chan struct{}
 	activeJobs  atomic.Int64
@@ -50,7 +52,7 @@ type WorkerPool struct {
 func NewWorkerPool(workers int, queueSize int) *WorkerPool {
 	wp := &WorkerPool{
 		workers:  workers,
-		jobQueue: make(chan AnalysisRequest, queueSize),
+		jobQueue: make(chan *AnalysisRequest, queueSize),
 		wg:       sync.WaitGroup{},
 		quit:     make(chan struct{}),
 	}
@@ -72,7 +74,7 @@ func (wp *WorkerPool) Stop() {
 }
 
 // Try to submit new request
-func (wp *WorkerPool) Submit(request AnalysisRequest) bool {
+func (wp *WorkerPool) Submit(request *AnalysisRequest) bool {
 	select {
 	case wp.jobQueue <- request:
 		wp.pendingJobs.Add(1)
@@ -128,7 +130,7 @@ func searchTimeout(done chan bool, engine *uttt.Engine) {
 	}
 }
 
-func getAnalysisLimits(req AnalysisRequest) *mcts.Limits {
+func getAnalysisLimits(req *AnalysisRequest) *mcts.Limits {
 	limits := mcts.DefaultLimits()
 	*limits = DefaultConfig.Engine.DefaultLimits
 
@@ -152,7 +154,7 @@ func getAnalysisLimits(req AnalysisRequest) *mcts.Limits {
 }
 
 // Handle engine search
-func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) AnalysisResponse {
+func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) AnalysisResponse {
 	// Decrement the counter
 	defer wp.activeJobs.Add(-1)
 
@@ -173,21 +175,19 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 		}
 	}
 
-	// Get the limits
+	// Get the limits and attach new listener
 	limits := getAnalysisLimits(req)
+	engine.Mcts().ResetListener()
+	*engine.Mcts().StatsListener() = req.Listener
 
 	// Use here a timeout
-	searchFinished := make(chan bool)
-	go searchTimeout(searchFinished, engine)
+	go searchTimeout(req.Kill, engine)
 
 	// Search, and return the result
-	// fmt.Println("limits", *limits)
 	engine.SetLimits(limits)
 	result := engine.Think()
 
-	// DEBUG
-	fmt.Println(result)
-	close(searchFinished)
+	close(req.Kill)
 
 	// fmt.Println("search-result", result)
 	// Create the pv string slice
@@ -203,5 +203,6 @@ func (wp *WorkerPool) handleSearch(req AnalysisRequest, engine *uttt.Engine) Ana
 		Pv:    pv,
 		Nps:   result.Nps,
 		Eval:  result.StringValue(),
+		Final: true,
 	}
 }

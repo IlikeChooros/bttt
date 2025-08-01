@@ -1,7 +1,6 @@
 package uttt
 
 import (
-	"fmt"
 	"uttt/internal/mcts"
 )
 
@@ -39,7 +38,6 @@ func (e *Engine) Search() {
 
 // Search the moves, in a blocking way
 func (e *Engine) Think() SearchResult {
-	fmt.Printf("Limits: %v", *e.mcts.Limits())
 	e.mcts.Search()
 	return e.mcts.SearchResult(e.policy)
 }
@@ -73,7 +71,7 @@ func (e *Engine) Stop() {
 
 func (e *Engine) Pv() *MoveList {
 	pv, _, _ := e.mcts.Pv(e.policy)
-	return pv
+	return ToMoveList(pv)
 }
 
 func (e *Engine) Mcts() *UtttMCTS {

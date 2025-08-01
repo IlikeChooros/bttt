@@ -84,6 +84,11 @@ func TestTerminationsByMove(t *testing.T) {
 		TerminationCrossWon,
 		TerminationCircleWon,
 	}
+
+	turns := []TurnType{
+		CrossTurn, CircleTurn, CrossTurn,
+	}
+
 	for i, position := range positions {
 
 		// Run these as subtests
@@ -111,6 +116,10 @@ func TestTerminationsByMove(t *testing.T) {
 			// Check if the terminations match
 			if !pos.IsTerminated() || states[i] != pos.termination {
 				t.Errorf("Termination state doesn't match, got=%v, want=%v", pos.termination, states[i])
+			}
+
+			if turns[i] != pos.Turn() {
+				t.Error("Position turn doesn't match with termination turn!")
 			}
 		})
 	}

@@ -71,6 +71,38 @@ func (mcts *UtttMCTS) SetNotation(notation string) error {
 	return mcts.ops.position.FromNotation(notation)
 }
 
+func ToSearchResult(stats mcts.ListenerTreeStats[PosType]) SearchResult {
+	result := SearchResult{
+		Bestmove: stats.BestMove,
+		Nodes:    0,
+		Nps:      stats.Nps,
+		Depth:    stats.Maxdepth,
+		Cycles:   int32(stats.Cycles),
+		Pv:       stats.Pv,
+	}
+
+	// Set the score
+	if stats.Terminal {
+		if stats.Draw {
+			result.ScoreType = ValueScore
+			result.Value = 50
+		} else {
+			result.ScoreType = MateScore
+			result.Value = len(stats.Pv)
+
+			// If the game ends on our turn, we are losing
+			if result.Value%2 == 0 {
+				result.Value = -result.Value
+			}
+		}
+	} else {
+		result.ScoreType = ValueScore
+		result.Value = int(100 * stats.Eval)
+	}
+
+	return result
+}
+
 func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 	pv, terminal, draw := mcts.Pv(pvPolicy)
 	turn := 1
@@ -80,7 +112,7 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 		Nps:      uint64(mcts.Nps()),
 		Depth:    mcts.MaxDepth(),
 		Cycles:   mcts.Root.Visits(),
-		Pv:       *pv,
+		Pv:       pv,
 	}
 
 	if mcts.ops.position.Turn() == CircleTurn {
@@ -94,10 +126,10 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 			result.Value = 50
 		} else {
 			result.ScoreType = MateScore
-			result.Value = pv.Size() * turn
+			result.Value = len(pv) * turn
 
 			// If the game ends on our turn, we are losing
-			if pv.Size()%2 == 0 {
+			if len(pv)%2 == 0 {
 				result.Value = -result.Value
 			}
 		}
@@ -112,21 +144,6 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 	}
 
 	return result
-}
-
-// Get the principal variation (pv, mate, draw)
-func (self *UtttMCTS) Pv(policy mcts.BestChildPolicy) (*MoveList, bool, bool) {
-	nodes, mate := self.MCTS.Pv(policy)
-	pv := NewMoveList()
-	var node *mcts.NodeBase[PosType]
-
-	for i := range nodes {
-		node = nodes[i]
-		pv.AppendMove(node.NodeSignature)
-	}
-
-	avg := node.AvgOutcome()
-	return pv, mate, (mate && avg == 0.5)
 }
 
 type UtttOperations struct {
@@ -189,14 +206,11 @@ func (ops *UtttOperations) Rollout() mcts.Result {
 	}
 
 	// If that's not a draw
-	if ops.position.termination != TerminationDraw {
-		// We lost
-		if ops.position.Turn() == leafTurn {
-			result = 1.0
-		} else {
-			// We won
-			result = 0.0
-		}
+	if t := ops.position.termination; t == TerminationCircleWon && leafTurn == CircleTurn ||
+		t == TerminationCrossWon && leafTurn == CrossTurn {
+		result = 1.0
+	} else if t != TerminationDraw {
+		result = 0.0
 	}
 
 	// Undo the moves

@@ -31,12 +31,12 @@ type SearchResult struct {
 	Nps       uint64
 	Depth     int
 	Cycles    int32
-	Pv        MoveList
+	Pv        []PosType
 }
 
 func (s SearchResult) String() string {
-	return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %s",
-		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Pv.String())
+	return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
+		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Pv)
 }
 
 // Get the string representation of the value

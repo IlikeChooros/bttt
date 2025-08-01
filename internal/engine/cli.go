@@ -225,11 +225,19 @@ func (cli *Cli) handleGo(tokens []string) error {
 		}
 
 		switch tokens[i] {
+		// Move these into 'engine options'
+		case "threads":
+			err = _parseIntToken(i+1, tokens, func(threads int) {
+				limits.SetThreads(threads)
+				i++
+			})
 		case "mbsize":
 			err = _parseIntToken(i+1, tokens, func(mbsize int) {
 				limits.SetMbSize(mbsize)
 				i++
 			})
+
+		// Actual search limits
 		case "depth":
 			// Next token should be an integer value
 			err = _parseIntToken(i+1, tokens, func(depth int) {

@@ -51,7 +51,7 @@ func MetricsHandler() http.HandlerFunc {
 	}
 }
 
-func (wp *WorkerPool) processJobWithMetrics(engine *uttt.Engine, req AnalysisRequest) {
+func (wp *WorkerPool) processJobWithMetrics(engine *uttt.Engine, req *AnalysisRequest) {
 	start := time.Now()
 
 	// Update average duration

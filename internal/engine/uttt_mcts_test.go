@@ -342,7 +342,7 @@ func TestMCTSMultiThreadedSearch(t *testing.T) {
 
 	result := engine.SearchResult(mcts.BestChildWinRate)
 
-	if result.Pv.size == 0 {
+	if len(result.Pv) == 0 {
 		t.Error("Pv shouldn't be empty after search")
 	}
 	if result.Bestmove == PosIllegal {

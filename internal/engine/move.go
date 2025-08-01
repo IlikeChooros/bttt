@@ -19,6 +19,13 @@ func NewMoveList() *MoveList {
 	return mv
 }
 
+func ToMoveList(moves []PosType) *MoveList {
+	mv := &MoveList{}
+	copy(mv.moves[:], moves)
+	mv.size = uint8(len(moves))
+	return mv
+}
+
 // Create a move, based on big and small indexes
 func MakeMove(bigIndex, smallIndex int) PosType {
 	return PosType((smallIndex & _moveSmallIndexMask) | ((bigIndex << 4) & _moveBigIndexMask))

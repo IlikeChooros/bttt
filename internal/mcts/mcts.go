@@ -2,6 +2,7 @@ package mcts
 
 import (
 	"fmt"
+	"math"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -11,7 +12,7 @@ import (
 
 var VirtualLoss int32 = 0
 
-// Result of the rollout, should range from [0, 1] 0 being loss from the root's perspective
+// Result of the rollout, should range from [0, 1] - 0 being loss from the leaf's node perspective
 // and 1 being a win
 type Result float64
 type MoveLike comparable
@@ -208,7 +209,6 @@ type GameOperations[T MoveLike] interface {
 	// Function to make the playout, until terminal node is reached,
 	// in case of UTTT, play random moves, until we reach draw/win/loss
 	Rollout() Result
-
 	// Reset game state to current internal position, called after changing
 	// position, for example using SetNotation function in engine
 	Reset()
@@ -225,6 +225,7 @@ type TreeStats struct {
 
 type MCTS[T MoveLike] struct {
 	TreeStats
+	listener         *StatsListener[T]
 	Limiter          LimiterLike
 	selection_policy SelectionPolicy[T]
 	Root             *NodeBase[T]
@@ -232,6 +233,7 @@ type MCTS[T MoveLike] struct {
 	wg               sync.WaitGroup
 }
 
+// Create new base tree
 func NewMTCS[T MoveLike](
 	selectionPolicy SelectionPolicy[T],
 	operations GameOperations[T],
@@ -239,6 +241,7 @@ func NewMTCS[T MoveLike](
 ) *MCTS[T] {
 	mcts := &MCTS[T]{
 		TreeStats:        TreeStats{},
+		listener:         &StatsListener[T]{},
 		Limiter:          LimiterLike(NewLimiter(uint32(unsafe.Sizeof(NodeBase[T]{})))),
 		selection_policy: selectionPolicy,
 		Root:             &NodeBase[T]{GameFlags: flags},
@@ -249,6 +252,20 @@ func NewMTCS[T MoveLike](
 	mcts.Root.state.Store(2)
 	mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
 	return mcts
+}
+
+func (mcts *MCTS[T]) invokeListener(f ListenerFunc[T]) {
+	if f != nil {
+		listenerInvoke(f, mcts)
+	}
+}
+
+func (mcts *MCTS[T]) ResetListener() {
+	mcts.listener.OnCycle(nil).OnDepth(nil).OnStop(nil)
+}
+
+func (mcts *MCTS[T]) StatsListener() *StatsListener[T] {
+	return mcts.listener
 }
 
 func (mcts *MCTS[T]) IsThinking() bool {
@@ -323,13 +340,15 @@ func (mcts *MCTS[T]) Reset(ops GameOperations[T], isTerminated bool) {
 	ops.Reset()
 	mcts.Root = newRootNode[T](isTerminated)
 	mcts.size.Store(1)
-	mcts.Root.state.Store(2)
+	mcts.Root.CanExpand()
+	mcts.Root.FinishExpanding()
 
 	if !isTerminated {
 		mcts.size.Add(ops.ExpandNode(mcts.Root))
 	}
 }
 
+// 'the best move' in the position
 func (mcts *MCTS[T]) RootSignature() T {
 	var signature T
 	if bestChild := mcts.BestChild(mcts.Root, BestChildMostVisits); bestChild != nil {
@@ -338,35 +357,42 @@ func (mcts *MCTS[T]) RootSignature() T {
 	return signature
 }
 
+// Current evaluation of the position
+func (mcts *MCTS[T]) RootScore() Result {
+	if bestChild := mcts.BestChild(mcts.Root, BestChildMostVisits); bestChild != nil {
+		return bestChild.Outcomes() / Result(bestChild.Visits())
+	}
+	return Result(math.NaN())
+}
+
 // Return best child, based on the number of visits
 func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeBase[T] {
 	var bestChild *NodeBase[T]
 	var child *NodeBase[T]
 
 	// DEBUG
-	rootTurn := mcts.Root.Turn() == node.Turn()
-	// childSameAsRootTurn := mcts.Root.Turn() == node.Turn()
-	if rootTurn {
-		fmt.Println("Root's turn")
-	} else {
-		fmt.Println("Enemy's turn")
-	}
-
-	for i := range node.Children {
-		ch := &node.Children[i]
-		fmt.Printf("%d. %v v=%d (wr=%.2f)\n",
-			i+1, ch.NodeSignature, ch.Visits(),
-			float64(ch.Outcomes())/float64(ch.Visits()),
-		)
-	}
+	// rootTurn := mcts.Root.Turn() == node.Turn()
+	// if rootTurn {
+	// 	fmt.Print("Root's turn")
+	// } else {
+	// 	fmt.Print("Enemy's turn")
+	// }
+	// fmt.Printf(" wr=%0.2f\n", float64(node.Outcomes())/float64(node.Visits()))
+	// for i := range node.Children {
+	// 	ch := &node.Children[i]
+	// 	fmt.Printf("%d. %v v=%d (wr=%.2f)\n",
+	// 		i+1, ch.NodeSignature, ch.Visits(),
+	// 		float64(ch.Outcomes())/float64(ch.Visits()),
+	// 	)
+	// }
 
 	switch policy {
 	case BestChildMostVisits:
 		maxVisits := 0
 		for i := 0; i < len(node.Children); i++ {
 			child = &node.Children[i]
-			if v := int(child.Visits()); v > maxVisits && v > 0 {
-				maxVisits = int(child.Visits())
+			if v := int(child.RealVisits()); v > maxVisits && v > 0 {
+				maxVisits = int(child.RealVisits())
 				bestChild = child
 			}
 		}
@@ -402,16 +428,21 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 		}
 	}
 
-	if bestChild != nil {
-		fmt.Println("Chose", bestChild.NodeSignature)
-	}
+	// if bestChild != nil {
+	// 	fmt.Println("Chose", bestChild.NodeSignature)
+	// }
 
 	return bestChild
 }
 
+// TODO: implement this, a simple find k max elements in the array
+func (mcts *MCTS[T]) MultiPvNodes(policy BestChildPolicy, pvCount int) [][]*NodeBase[T] {
+	return nil
+}
+
 // Get the principal variation (ie. the best sequence of moves)
 // based on given best child policy
-func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]*NodeBase[T], bool) {
+func (mcts *MCTS[T]) PvNodes(policy BestChildPolicy) ([]*NodeBase[T], bool) {
 	if mcts.Root == nil {
 		return nil, false
 	}
@@ -438,4 +469,21 @@ func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]*NodeBase[T], bool) {
 	}
 
 	return pv, mate
+}
+
+// Get the pricipal variation, but only the moves
+func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]T, bool, bool) {
+	if mcts.Root == nil {
+		return nil, false, false
+	}
+
+	var node *NodeBase[T]
+	nodes, mate := mcts.PvNodes(policy)
+	pv := make([]T, len(nodes))
+	for i := range nodes {
+		node = nodes[i]
+		pv[i] = node.NodeSignature
+	}
+
+	return pv, mate, (mate && node.AvgOutcome() == 0.5)
 }

@@ -1,7 +1,6 @@
 package mcts
 
 import (
-	"fmt"
 	"math"
 	"math/rand"
 	"time"
@@ -70,8 +69,6 @@ func (mcts *MCTS[T]) SearchMultiThreaded(ops GameOperations[T]) {
 	// 	threadExploration = ExplorationParam
 	// }
 	VirtualLoss = 1 + (int32(threads)-1)*20
-
-	fmt.Printf("Exp=%f, VL=%d\n", threadExploration, VirtualLoss)
 	// VirtualLoss = 5
 
 	for id := range threads {
@@ -120,21 +117,23 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 		// Get the result of the rollout/playout
 		result := ops.Rollout()
 		mcts.Backpropagate(ops, node, result)
+
 		// Store the nps
 		mcts.nps.Store(mcts.nodes.Load() * 1000 / mcts.Limiter.Elapsed())
+		mcts.invokeListener(mcts.listener.onCycle)
 	}
 
 	// Synchronize all threads
 	mcts.Limiter.Stop()
+
+	// Make sure only 1 thread calls this
+	if threadId == 0 {
+		mcts.invokeListener(mcts.listener.onStop)
+	}
 }
 
 // Selects next child to expand, by user-defined selection policy
 func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand) *NodeBase[T] {
-
-	// Apply virtual loss (for compabality in backpropagation)
-	// mcts.Root.virtualLoss.Add(virtualLoss)
-	// atomic.AddInt32(&mcts.Root.Visits, virtualLoss)
-	// mcts.Root.AddVvl(virtualLoss, VirtualLoss)
 
 	node := mcts.Root
 	depth := 0
@@ -177,6 +176,9 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand) *No
 	// Set the 'max depth'
 	if depth > int(mcts.maxdepth.Load()) {
 		mcts.maxdepth.Store(int32(depth))
+		if depth >= 2 {
+			mcts.invokeListener(mcts.listener.onDepth)
+		}
 	}
 
 	// return the candidate
@@ -205,9 +207,9 @@ func (mcts *MCTS[T]) Backpropagate(ops GameOperations[T], node *NodeBase[T], res
 			node.AddVvl(1, 0)
 		}
 
+		result = 1.0 - result // switch the result
 		// Add the outcome
 		node.AddOutcome(result)
-		result = 1.0 - result // switch the result
 
 		// Backpropagate
 		node = node.Parent

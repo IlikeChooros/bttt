@@ -62,12 +62,12 @@ func LoadConfig() {
 		Pool: PoolConfig{
 			DefaultWorkers:   utils.GetEnvInt("WORKERS", 4),
 			DefaultQueueSize: utils.GetEnvInt("QUEUE_SIZE", 100),
-			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 30*time.Second),
+			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 10*time.Second),
 		},
 		Engine: EngineConfig{
 			DefaultLimits: *mcts.DefaultLimits(),
 			MaxDepth:      utils.GetEnvInt("MAX_DEPTH", 14),
-			MaxMovetime:   utils.GetEnvInt("MAX_MOVETIME", 20000),
+			MaxMovetime:   utils.GetEnvInt("MAX_MOVETIME", 9000),
 			MaxSizeMb:     utils.GetEnvInt("MAX_TREE_SIZE_MB", 16),
 			Threads:       utils.GetEnvInt("N_SEARCH_THREADS", 4),
 		},
