@@ -44,7 +44,7 @@ func (mcts *UtttMCTS) Search() {
 
 // Default selection
 func (mcts *UtttMCTS) Selection() *mcts.NodeBase[PosType] {
-	return mcts.MCTS.Selection(mcts.ops, rand.New(rand.NewSource(time.Now().UnixNano())))
+	return mcts.MCTS.Selection(mcts.ops, rand.New(rand.NewSource(time.Now().UnixNano())), 0)
 }
 
 // Default backprop

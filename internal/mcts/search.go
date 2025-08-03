@@ -113,7 +113,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 	for mcts.Limiter.Ok(mcts.Nodes(), mcts.Size(), uint32(mcts.MaxDepth()), uint32(mcts.Root.Visits())) {
 
 		// Choose the most promising node
-		node = mcts.Selection(ops, threadRand)
+		node = mcts.Selection(ops, threadRand, threadId)
 		// Get the result of the rollout/playout
 		result := ops.Rollout()
 		mcts.Backpropagate(ops, node, result)
@@ -133,7 +133,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 }
 
 // Selects next child to expand, by user-defined selection policy
-func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand) *NodeBase[T] {
+func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand, threadId int) *NodeBase[T] {
 
 	node := mcts.Root
 	depth := 0
@@ -174,11 +174,10 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand) *No
 	}
 
 	// Set the 'max depth'
-	if depth > int(mcts.maxdepth.Load()) {
+	if threadId == 0 && depth >= 2 && depth > int(mcts.maxdepth.Load()) {
+		// Fix: Allow only 1 thread (main) to change the 'maxdepth'
 		mcts.maxdepth.Store(int32(depth))
-		if depth >= 2 {
-			mcts.invokeListener(mcts.listener.onDepth)
-		}
+		mcts.invokeListener(mcts.listener.onDepth)
 	}
 
 	// return the candidate

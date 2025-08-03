@@ -6,7 +6,6 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	// mine
@@ -43,8 +42,8 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 		logger.Info("rtAnalysis: new position", "pos", wsRequest.Position)
 
 		// Setup listeners & buffered channel
-		resultCounter := atomic.Int32{}
-		searchResults := make(chan AnalysisResponse, DefaultConfig.Engine.MaxDepth)
+		// resultCounter := atomic.Int32{}
+		searchResults := make(chan AnalysisResponse, DefaultConfig.Engine.MaxDepth+1)
 		wsRequest.Response = make(chan AnalysisResponse)
 		wsRequest.Kill = make(chan bool)
 		wsRequest.Listener.
@@ -62,18 +61,11 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 					Final: false,
 				}
 
-				resultCounter.Add(1)
-				if resultCounter.Load() < int32(DefaultConfig.Engine.MaxDepth) {
-					searchResults <- response // Put it into channel queue, don't waste preciouse search time
-				}
+				fmt.Println("Putting into sr queue")
+				searchResults <- response // Put it into channel queue, don't waste preciouse search time
 			}).
 			OnStop(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
-				if resultCounter.Load() != int32(DefaultConfig.Engine.MaxDepth) {
-					close(searchResults)
-				} else {
-					close(searchResults)
-				}
-
+				close(searchResults)
 			})
 
 		// Submit to worker pool
