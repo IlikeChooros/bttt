@@ -98,7 +98,8 @@ func (mcts *MCTS[T]) setupSearch() {
 //
 // 3. backpropagate - to increment counters up to the root
 //
-// Until runs out of the allocated time, nodes, or memory
+// Until runs out of the allocated time, nodes, or memory.
+// threadId must be unique, 0 meaning it's the main search threads with some privileges
 func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 	defer mcts.wg.Done()
 

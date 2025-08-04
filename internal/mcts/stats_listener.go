@@ -43,7 +43,7 @@ type StatsListener[T MoveLike] struct {
 	onStop ListenerFunc[T]
 }
 
-// Attach new on max depth change callback
+// Attach new on max depth change callback, will be called only be the main search thread
 func (listener *StatsListener[T]) OnDepth(onDepth ListenerFunc[T]) *StatsListener[T] {
 	listener.onDepth = onDepth
 	return listener
@@ -55,7 +55,7 @@ func (listener *StatsListener[T]) OnCycle(onCycle ListenerFunc[T]) *StatsListene
 	return listener
 }
 
-// Attach 'on stop signal' callback, executed when the search has ended
+// Attach 'on stop signal' callback, executed when the search has ended,
 func (listener *StatsListener[T]) OnStop(onStop ListenerFunc[T]) *StatsListener[T] {
 	listener.onStop = onStop
 	return listener

@@ -118,8 +118,10 @@ I have tried:
   - [x] Working for maximizing player (or for the player whose turn is set to 1)
   - Simply minimizing the opponent's score (choosing the node with the lowest wr), and always choosing to terminate the position (since that's always the winning move)
 - [ ] Remove hashing of the positions, since no hash table is used in MCTS 
-- [ ] Fix: In multithreaded search, 'maxdepth' may be called twice on the same depth increase
+- [x] Fix: In multithreaded search, 'maxdepth' may be called twice on the same depth increase
   - Expected: Each 'depth increase' should be called only once 
+- [ ] Add multi-pv support
+
 ### Add-ons
 - [x] Add statistics listener interface:
   - Use ticks to set the engine results, for example on each max depth increase
@@ -135,10 +137,11 @@ I have tried:
   - One that silently updates them
   - The other that also prints them to the console
 
-### Notes
-Engine is still kinda weak, it looks like it can detect mates, but it can't really 
-avoid them: Maybe rewrite the 'mating' detection in pv, so that only the enemy will
-always choose to make the terminating move
+## Ideas
+
+- Maybe write the critical code in C?
+
+
 
 # Server
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 
 	// mine
@@ -29,7 +28,6 @@ var wsUpgrader = websocket.Upgrader{
 
 func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logger) {
 	defer conn.Close()
-	var mx sync.Mutex
 
 	for {
 		var wsRequest AnalysisRequest
@@ -70,22 +68,18 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 
 		// Submit to worker pool
 		if !workerPool.Submit(&wsRequest) {
-			mx.Lock()
 			if err := conn.WriteJSON(AnalysisResponse{
 				Error: "Failed to submit analysis, try again later",
 			}); err != nil {
 				logger.Error("RtAnalysis: failed to notify user on failed analysis submit")
 			}
-			mx.Unlock()
 			return
 		}
 
 		// Read the responses
 		for resp := range searchResults {
-			mx.Lock()
 			logger.Info("Sending response", "data", resp)
 			err := conn.WriteJSON(resp)
-			mx.Unlock()
 			if err != nil {
 				logger.Error("RtAnalysis: failed finished analysis notify")
 				return
@@ -95,17 +89,13 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 		// Wait for the response
 		select {
 		case resp := <-wsRequest.Response: // final response
-			mx.Lock()
 			logger.Info("Sending last response", "data", resp)
 			err := conn.WriteJSON(resp)
-			mx.Unlock()
 			if err != nil {
 				logger.Error("RtAnalysis: failed finished analysis notify")
 				return
 			}
 		case <-time.After(DefaultConfig.Pool.JobTimeout):
-			mx.Lock()
-			defer mx.Unlock()
 			if err := conn.WriteJSON(AnalysisResponse{Error: "Analysis timeout"}); err != nil {
 				logger.Error("RtAnalysis: failed analysis timeout notify")
 			}
