@@ -3,6 +3,7 @@ package mcts
 import (
 	"fmt"
 	"math"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"unsafe"
@@ -256,7 +257,7 @@ func NewMTCS[T MoveLike](
 
 func (mcts *MCTS[T]) invokeListener(f ListenerFunc[T]) {
 	if f != nil {
-		listenerInvoke(f, mcts)
+		f(toListenerStats(mcts))
 	}
 }
 
@@ -435,21 +436,69 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 	return bestChild
 }
 
-// TODO: implement this, a simple find k max elements in the array
-func (mcts *MCTS[T]) MultiPvNodes(policy BestChildPolicy, pvCount int) [][]*NodeBase[T] {
-	return nil
+type PvResult[T MoveLike] struct {
+	Root     *NodeBase[T]
+	Pv       []T
+	Terminal bool
+	Draw     bool
+}
+
+// Returns 'pvCount' best move lines
+func (mcts *MCTS[T]) MultiPv(policy BestChildPolicy) []PvResult[T] {
+	if mcts.Root == nil {
+		return nil
+	}
+
+	pvCount := mcts.Limiter.Limits().MultiPv
+	multipv := make([]PvResult[T], 0, pvCount)
+	child_count := len(mcts.Root.Children)
+	root_nodes := make([]*NodeBase[T], child_count)
+	for i := range child_count {
+		root_nodes[i] = &mcts.Root.Children[i]
+	}
+
+	slices.SortFunc(root_nodes, func(a *NodeBase[T], b *NodeBase[T]) int {
+		va, vb := a.Visits(), b.Visits()
+		if va < vb {
+			return 1
+		} else if va > vb {
+			return -1
+		}
+		return 0
+	})
+
+	for i := range pvCount {
+		// Get the Pv from this 'Root'
+		if i < child_count {
+			pv, terminal, draw := mcts.Pv(root_nodes[i], policy, true)
+			multipv = append(multipv, PvResult[T]{
+				Root:     root_nodes[i],
+				Pv:       pv,
+				Terminal: terminal,
+				Draw:     draw,
+			})
+		} else {
+			break
+		}
+	}
+
+	return multipv
 }
 
 // Get the principal variation (ie. the best sequence of moves)
-// based on given best child policy
-func (mcts *MCTS[T]) PvNodes(policy BestChildPolicy) ([]*NodeBase[T], bool) {
-	if mcts.Root == nil {
+// from given starting 'root' node, based on given best child policy
+func (mcts *MCTS[T]) PvNodes(root *NodeBase[T], policy BestChildPolicy, includeRoot bool) ([]*NodeBase[T], bool) {
+	if root == nil {
 		return nil, false
 	}
 
-	pv := make([]*NodeBase[T], 0, mcts.MaxDepth())
-	node := mcts.Root
+	pv := make([]*NodeBase[T], 0, mcts.MaxDepth()+1)
+	node := root
 	mate := false
+
+	if includeRoot {
+		pv = append(pv, root)
+	}
 
 	// Simply select 'best child' until we don't have any children
 	// or the node is nil
@@ -472,15 +521,15 @@ func (mcts *MCTS[T]) PvNodes(policy BestChildPolicy) ([]*NodeBase[T], bool) {
 }
 
 // Get the pricipal variation, but only the moves
-func (mcts *MCTS[T]) Pv(policy BestChildPolicy) ([]T, bool, bool) {
-	if mcts.Root == nil {
+func (mcts *MCTS[T]) Pv(root *NodeBase[T], policy BestChildPolicy, includeRoot bool) ([]T, bool, bool) {
+	if root == nil {
 		return nil, false, false
 	}
 
 	var node *NodeBase[T]
-	nodes, mate := mcts.PvNodes(policy)
+	nodes, mate := mcts.PvNodes(root, policy, includeRoot)
 	pv := make([]T, len(nodes))
-	for i := range nodes {
+	for i := range len(nodes) {
 		node = nodes[i]
 		pv[i] = node.NodeSignature
 	}

@@ -70,8 +70,12 @@ func (e *Engine) Stop() {
 }
 
 func (e *Engine) Pv() *MoveList {
-	pv, _, _ := e.mcts.Pv(e.policy)
+	pv, _, _ := e.mcts.Pv(e.mcts.Root, e.policy, false)
 	return ToMoveList(pv)
+}
+
+func (e *Engine) MultiPv() []mcts.PvResult[PosType] {
+	return e.mcts.MultiPv(e.policy)
 }
 
 func (e *Engine) Mcts() *UtttMCTS {

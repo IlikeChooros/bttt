@@ -14,6 +14,7 @@ type Limits struct {
 	Infinite bool
 	NThreads int
 	ByteSize int64
+	MultiPv  int
 }
 
 func (l Limits) String() string {
@@ -38,7 +39,9 @@ func DefaultLimits() *Limits {
 		Movetime: DefaultMovetimeLimit,
 		Infinite: true,
 		NThreads: 1,
-		ByteSize: DefaultByteSizeLimit}
+		ByteSize: DefaultByteSizeLimit,
+		MultiPv:  1,
+	}
 }
 
 // Set the maximum depth of the search
@@ -75,6 +78,11 @@ func (l *Limits) SetInfinite(infinite bool) {
 
 func (l *Limits) SetThreads(threads int) *Limits {
 	l.NThreads = max(threads, 1)
+	return l
+}
+
+func (l *Limits) SetMultiPv(multipv int) *Limits {
+	l.MultiPv = max(1, multipv)
 	return l
 }
 

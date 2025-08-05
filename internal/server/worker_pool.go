@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -11,13 +12,30 @@ import (
 	"uttt/internal/mcts"
 )
 
+type AnalysisLine struct {
+	Eval string   `json:"eval"`
+	Pv   []string `json:"pv"`
+}
+
+// Simply convert pv moves to pv strings, and convert eval to a string
+func ToAnalysisLine(engineLines []uttt.EngineLine) []AnalysisLine {
+	lines := make([]AnalysisLine, len(engineLines))
+	for i := range len(engineLines) {
+		lines[i].Eval = engineLines[i].StringValue()
+		lines[i].Pv = make([]string, len(engineLines[i].Pv))
+		for j := range len(engineLines[i].Pv) {
+			lines[i].Pv[j] = engineLines[i].Pv[j].String()
+		}
+	}
+	return lines
+}
+
 type AnalysisResponse struct {
-	Depth int      `json:"depth"`
-	Pv    []string `json:"pv"`
-	Nps   uint64   `json:"nps"`
-	Eval  string   `json:"eval"`
-	Final bool     `json:"final"`
-	Error string   `json:"error,omitempty"`
+	Lines []AnalysisLine `json:"lines"`
+	Depth int            `json:"depth"`
+	Nps   uint64         `json:"nps"`
+	Final bool           `json:"final"`
+	Error string         `json:"error,omitempty"`
 }
 
 type AnalysisRequest struct {
@@ -26,9 +44,36 @@ type AnalysisRequest struct {
 	Depth    int                              `json:"depth"`
 	Threads  int                              `json:"threads"`
 	SizeMb   int                              `json:"sizemb"`
+	MultiPv  int                              `json:"multipv"`
 	Response chan AnalysisResponse            `json:"-"`
 	Listener mcts.StatsListener[uttt.PosType] `json:"-"`
 	Kill     chan bool                        `json:"-"`
+}
+
+func (r AnalysisRequest) Validate() error {
+	validator := func(value int, min int, max int, name string) error {
+		if value < min || value > max {
+			return fmt.Errorf("Invalid %s value: %d, expected between %d-%d", name, value, min, max)
+		}
+		return nil
+	}
+
+	if err := validator(r.Movetime, 0, DefaultConfig.Engine.MaxMovetime, "movetime"); err != nil {
+		return err
+	}
+	if err := validator(r.Depth, 1, DefaultConfig.Engine.MaxDepth, "depth"); err != nil {
+		return err
+	}
+	if err := validator(r.Threads, 1, DefaultConfig.Engine.Threads, "threads"); err != nil {
+		return err
+	}
+	if err := validator(r.SizeMb, 1, DefaultConfig.Engine.MaxSizeMb, "sizemb"); err != nil {
+		return err
+	}
+	if err := validator(r.MultiPv, 1, DefaultConfig.Engine.MaxMultiPv, "multipv"); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r AnalysisRequest) String() string {
@@ -150,6 +195,8 @@ func getAnalysisLimits(req *AnalysisRequest) *mcts.Limits {
 		limits.SetMbSize(min(req.SizeMb, DefaultConfig.Engine.MaxSizeMb))
 	}
 
+	limits.SetMultiPv(req.MultiPv)
+
 	return limits
 }
 
@@ -189,20 +236,11 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) An
 
 	close(req.Kill)
 
-	// fmt.Println("search-result", result)
-	// Create the pv string slice
-	pv := make([]string, engine.Pv().Size())
-	slice := engine.Pv().Slice()
-	for i := range slice {
-		pv[i] = slice[i].String()
-	}
-
 	// Set the response object
 	return AnalysisResponse{
+		Lines: ToAnalysisLine(result.Lines),
 		Depth: result.Depth,
-		Pv:    pv,
 		Nps:   result.Nps,
-		Eval:  result.StringValue(),
 		Final: true,
 	}
 }

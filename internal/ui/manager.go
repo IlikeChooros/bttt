@@ -77,7 +77,7 @@ func (m *Manager) handleCommand(line string) error {
 		fmt.Print(m.e.Position().Notation(), CLEAR_LINE_FROM_CURSOR, CursorMoveVertical(1))
 	case "eval": // Let the engine search and play the best move.
 		m.e.SetLimits(m.limits)
-		result := m.e.Think()
+		result, _ := m.e.Think().MainLine()
 		if result.Bestmove != engine.PosIllegal && m.e.Position().IsLegal(result.Bestmove) {
 			m.e.Position().MakeMove(result.Bestmove)
 			defer PrintOK("[Engine]", fmt.Sprintf("Engine played %v", result.Bestmove))
@@ -126,7 +126,7 @@ func (m *Manager) handleMake(moves []string) error {
 
 	// Let engine respond automatically
 	m.e.SetLimits(m.limits)
-	res := m.e.Think()
+	res, _ := m.e.Think().MainLine()
 	if res.Bestmove != engine.PosIllegal && m.e.Position().IsLegal(res.Bestmove) {
 		m.makeMove(res.Bestmove)
 	}

@@ -72,77 +72,78 @@ func (mcts *UtttMCTS) SetNotation(notation string) error {
 }
 
 func ToSearchResult(stats mcts.ListenerTreeStats[PosType]) SearchResult {
+
 	result := SearchResult{
-		Bestmove: stats.BestMove,
-		Nodes:    0,
-		Nps:      stats.Nps,
-		Depth:    stats.Maxdepth,
-		Cycles:   int32(stats.Cycles),
-		Pv:       stats.Pv,
+		Nodes:  0,
+		Nps:    stats.Nps,
+		Depth:  stats.Maxdepth,
+		Cycles: int32(stats.Cycles),
+		Lines:  make([]EngineLine, len(stats.Lines)),
 	}
 
-	// Set the score
-	if stats.Terminal {
-		if stats.Draw {
-			result.ScoreType = ValueScore
-			result.Value = 50
-		} else {
-			result.ScoreType = MateScore
-			result.Value = len(stats.Pv)
+	for i := range len(stats.Lines) {
+		treeLine := &stats.Lines[i]
+		line := &result.Lines[i]
+		line.Pv = treeLine.Moves
 
-			// If the game ends on our turn, we are losing
-			if result.Value%2 == 0 {
-				result.Value = -result.Value
+		// Set the score
+		if treeLine.Terminal {
+			if treeLine.Draw {
+				line.ScoreType = ValueScore
+				line.Value = 50
+			} else {
+				line.ScoreType = MateScore
+				line.Value = len(treeLine.Moves)
+
+				// If the game ends on our turn, we are losing
+				if line.Value%2 == 0 {
+					line.Value = -line.Value
+				}
 			}
+		} else {
+			line.ScoreType = ValueScore
+			line.Value = int(100 * treeLine.Eval)
 		}
-	} else {
-		result.ScoreType = ValueScore
-		result.Value = int(100 * stats.Eval)
 	}
 
 	return result
 }
 
 func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
-	pv, terminal, draw := mcts.Pv(pvPolicy)
-	turn := 1
+
+	multipv := mcts.MultiPv(pvPolicy)
 	result := SearchResult{
-		Bestmove: mcts.RootSignature(),
-		Nodes:    uint64(mcts.Nodes()),
-		Nps:      uint64(mcts.Nps()),
-		Depth:    mcts.MaxDepth(),
-		Cycles:   mcts.Root.Visits(),
-		Pv:       pv,
+		Nodes:  uint64(mcts.Nodes()),
+		Nps:    uint64(mcts.Nps()),
+		Depth:  mcts.MaxDepth(),
+		Cycles: mcts.Root.Visits(),
+		Lines:  make([]EngineLine, len(multipv)),
 	}
 
-	if mcts.ops.position.Turn() == CircleTurn {
-		turn = -1
-	}
+	for i := range len(multipv) {
+		pvResult := multipv[i]
+		line := &result.Lines[i]
+		line.Pv = pvResult.Pv
 
-	// Set the score
-	if terminal {
-		if draw {
-			result.ScoreType = ValueScore
-			result.Value = 50
-		} else {
-			result.ScoreType = MateScore
-			result.Value = len(pv) * turn
+		// Set the score
+		if pvResult.Terminal {
+			if pvResult.Draw {
+				line.ScoreType = ValueScore
+				line.Value = 50
+			} else {
+				line.ScoreType = MateScore
+				line.Value = len(pvResult.Pv)
 
-			// If the game ends on our turn, we are losing
-			if len(pv)%2 == 0 {
-				result.Value = -result.Value
+				// If the game ends on our turn, we are losing
+				if line.Value%2 == 0 {
+					line.Value = -line.Value
+				}
 			}
-		}
-	} else {
-		visits := float64(mcts.Root.Visits())
-		wins := float64(mcts.Root.Outcomes())
-		if mcts.Root != nil && visits > 0 {
-			result.Value = int(100 * wins / visits)
 		} else {
-			result.Value = -100
+			line.ScoreType = ValueScore
+			line.Value = int(100 * pvResult.Root.AvgOutcome())
 		}
 	}
-
 	return result
 }
 

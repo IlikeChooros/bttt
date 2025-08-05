@@ -1,30 +1,41 @@
 package mcts
 
-type ListenerTreeStats[T MoveLike] struct {
+type SearchLine[T MoveLike] struct {
 	BestMove T
+	Moves    []T
 	Eval     float64
-	Maxdepth int
-	Cycles   int
-	TimeMs   int
-	Nps      uint64
-	Pv       []T
 	Terminal bool
 	Draw     bool
 }
 
+type ListenerTreeStats[T MoveLike] struct {
+	Maxdepth int
+	Cycles   int
+	TimeMs   int
+	Nps      uint64
+	Lines    []SearchLine[T]
+}
+
 // Convert TreeStats to 'ListenerTreeStats' struct
 func toListenerStats[T MoveLike](tree *MCTS[T]) ListenerTreeStats[T] {
-	pv, terminal, draw := tree.Pv(BestChildMostVisits)
+	pv := tree.MultiPv(BestChildMostVisits)
+	lines := make([]SearchLine[T], len(pv))
+	for i := range len(pv) {
+		lines[i] = SearchLine[T]{
+			BestMove: pv[i].Root.NodeSignature,
+			Moves:    pv[i].Pv,
+			Eval:     float64(pv[i].Root.AvgOutcome()),
+			Terminal: pv[i].Terminal,
+			Draw:     pv[i].Draw,
+		}
+	}
+
 	return ListenerTreeStats[T]{
-		BestMove: tree.RootSignature(),
-		Eval:     float64(tree.RootScore()),
+		Lines:    lines,
 		Maxdepth: int(tree.MaxDepth()),
 		Cycles:   int(tree.Root.Visits()),
 		TimeMs:   int(tree.Limiter.Elapsed()),
 		Nps:      uint64(tree.Nps()),
-		Pv:       pv,
-		Terminal: terminal,
-		Draw:     draw,
 	}
 }
 
@@ -59,9 +70,4 @@ func (listener *StatsListener[T]) OnCycle(onCycle ListenerFunc[T]) *StatsListene
 func (listener *StatsListener[T]) OnStop(onStop ListenerFunc[T]) *StatsListener[T] {
 	listener.onStop = onStop
 	return listener
-}
-
-// Invoke the listener's callback
-func listenerInvoke[T MoveLike](f ListenerFunc[T], tree *MCTS[T]) {
-	f(toListenerStats(tree))
 }

@@ -33,7 +33,7 @@ func TestMates(t *testing.T) {
 				return
 			}
 
-			result := engine.Think()
+			result, _ := engine.Think().MainLine()
 
 			if result.ScoreType != MateScore {
 				t.Errorf("ScoreType=%d, want=%d (%v, pv=%v)", result.ScoreType, MateScore, result, engine.Pv())
@@ -43,5 +43,15 @@ func TestMates(t *testing.T) {
 				t.Error("Expected other winning side, got=", result.Value, "want=", mate_depths[i])
 			}
 		})
+	}
+}
+
+func BenchmarkSingleThreadedSearch(b *testing.B) {
+	engine := NewEngine()
+	engine.SetLimits(mcts.DefaultLimits().SetThreads(1).SetCycles(10000))
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		_ = engine.Think()
 	}
 }

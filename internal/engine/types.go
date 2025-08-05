@@ -22,31 +22,47 @@ const (
 	MateScore  ScoreType = 1
 )
 
-// Struct holding information about the score value of the search
-type SearchResult struct {
-	Value     int
+type EngineLine struct {
+	Bestmove  PosType `json:"bestmove"`
+	Value     int     `json:"eval"`
 	ScoreType ScoreType
-	Bestmove  PosType
-	Nodes     uint64
-	Nps       uint64
-	Depth     int
-	Cycles    int32
 	Pv        []PosType
 }
 
-func (s SearchResult) String() string {
-	return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
-		s.StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Pv)
-}
-
 // Get the string representation of the value
-func (s SearchResult) StringValue() string {
+func (s EngineLine) StringValue() string {
 	if s.ScoreType == MateScore {
 		return fmt.Sprintf("%dM", s.Value)
 	} else if s.Value == -1 {
 		return "0.5"
 	}
 	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
+}
+
+// Struct holding information about the score value of the search
+type SearchResult struct {
+	Lines  []EngineLine
+	Nodes  uint64
+	Nps    uint64
+	Depth  int
+	Cycles int32
+}
+
+func (s SearchResult) String() string {
+	if len(s.Lines) > 0 {
+		return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
+			s.Lines[0].StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
+	}
+
+	return fmt.Sprintf("eval NaN depth %d nps %d nodes %d cycles %d pv empty",
+		s.Depth, s.Nps, s.Nodes, s.Cycles)
+}
+
+func (s SearchResult) MainLine() (EngineLine, bool) {
+	if len(s.Lines) > 0 {
+		return s.Lines[0], true
+	}
+	return EngineLine{}, false
 }
 
 // Fast bool to int conversion

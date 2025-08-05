@@ -35,8 +35,9 @@ type PoolConfig struct {
 type EngineConfig struct {
 	DefaultLimits mcts.Limits `json:"-"` // Default limits struct for the engine
 	MaxDepth      int         `json:"depth"`
-	MaxMovetime   int         `json:"-"`       // In milliseconds (10000 ms by default)
-	MaxSizeMb     int         `json:"mbsize"`  // maximum size of the tree in mb
+	MaxMovetime   int         `json:"-"`      // In milliseconds (10000 ms by default)
+	MaxSizeMb     int         `json:"mbsize"` // maximum size of the tree in mb
+	MaxMultiPv    int         `json:"multipv"`
 	Threads       int         `json:"threads"` // number of threads to use by default
 }
 
@@ -70,6 +71,7 @@ func LoadConfig() {
 			MaxMovetime:   utils.GetEnvInt("MAX_MOVETIME", 9000),
 			MaxSizeMb:     utils.GetEnvInt("MAX_TREE_SIZE_MB", 16),
 			Threads:       utils.GetEnvInt("N_SEARCH_THREADS", 4),
+			MaxMultiPv:    utils.GetEnvInt("MAX_MULTI_PV", 3),
 		},
 	}
 

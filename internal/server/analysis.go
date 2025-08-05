@@ -37,7 +37,16 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 			return
 		}
 
-		logger.Info("rtAnalysis: new position", "pos", wsRequest.Position)
+		// Validate request
+		if err := wsRequest.Validate(); err != nil {
+			logger.Error(err.Error())
+			if e := conn.WriteJSON(AnalysisResponse{Error: err.Error()}); e != nil {
+				logger.Error(e.Error())
+			}
+			return
+		}
+
+		logger.Info("rtAnalysis: new request", "data", wsRequest)
 
 		// Setup listeners & buffered channel
 		// resultCounter := atomic.Int32{}
@@ -47,15 +56,11 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 		wsRequest.Listener.
 			OnDepth(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
 				result := uttt.ToSearchResult(lts)
-				pv := make([]string, len(result.Pv))
-				for i := range result.Pv {
-					pv[i] = result.Pv[i].String()
-				}
+
 				response := AnalysisResponse{
+					Lines: ToAnalysisLine(result.Lines),
 					Depth: result.Depth,
-					Pv:    pv,
 					Nps:   result.Nps,
-					Eval:  result.StringValue(),
 					Final: false,
 				}
 

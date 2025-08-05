@@ -340,7 +340,7 @@ func TestMCTSMultiThreadedSearch(t *testing.T) {
 	engine.Limits().SetThreads(4).SetNodes(20000)
 	engine.Search()
 
-	result := engine.SearchResult(mcts.BestChildWinRate)
+	result, _ := engine.SearchResult(mcts.BestChildWinRate).MainLine()
 
 	if len(result.Pv) == 0 {
 		t.Error("Pv shouldn't be empty after search")
