@@ -202,7 +202,7 @@ func (ops *UtttOperations) Rollout() mcts.Result {
 		moves = ops.position.GenerateMoves()
 
 		// Choose at random move
-		move = moves.moves[ops.random.Int31n(int32(moves.size))]
+		move = moves.moves[ops.random.Int31()%int32(moves.size)]
 		ops.position.MakeMove(move)
 	}
 

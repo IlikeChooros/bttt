@@ -36,24 +36,23 @@ type SelectionPolicy[T MoveLike] func(parent, root *NodeBase[T]) *NodeBase[T]
 // wins, and losses should be accessed only with atomic operations
 // However to read the visit and virtual loss counts, use the methods
 type NodeStats struct {
+	outcomes Result // float64 value of compounded outcomes for this node
+
 	// This is visit counter, it cannot be read by atomic, use GetVvl() Visits() to properly read this value
 	visits int32
 
 	// Current virtual loss applied to visits, it always meets condition: visits - virtualLoss >= 0.
 	// Read this value ONLY with GetVvl() or VirtualLoss() methods
 	virtualLoss int32
-
-	outcomes Result // float64 value of compounded outcomes for this node
-
-	// Synchornizes read/write on visits, virtual loss and outcomes
-	statsMutex sync.RWMutex
 }
 
-type GameFlags uint8
+type NodeFlags uint8
 
 const (
-	TurnMask     GameFlags = 1
-	TerminalMask GameFlags = 2
+	CanExpand     NodeFlags = 0
+	ExpandingMask NodeFlags = 1
+	ExpandedMask  NodeFlags = 2
+	TerminalMask  NodeFlags = 4
 )
 
 type NodeBase[T MoveLike] struct {
@@ -61,14 +60,15 @@ type NodeBase[T MoveLike] struct {
 	NodeSignature T
 	Children      []NodeBase[T]
 	Parent        *NodeBase[T]
-	GameFlags     GameFlags
-	state         atomic.Uint32 // atomic flag for 'expanded'
+	// Synchornizes read/write on visits, virtual loss and outcomes
+	nodeMutex sync.RWMutex
+	Flags     NodeFlags
 }
 
 func newRootNode[T MoveLike](terminated bool) *NodeBase[T] {
 	return &NodeBase[T]{
-		Children:  nil,
-		GameFlags: TerminalFlag(terminated),
+		Children: nil,
+		Flags:    TerminalFlag(terminated),
 	}
 }
 
@@ -77,38 +77,38 @@ func NewBaseNode[T MoveLike](parent *NodeBase[T], signature T, terminated bool) 
 		NodeSignature: signature,
 		Children:      nil,
 		Parent:        parent,
-		GameFlags:     TerminalFlag(terminated) | ((parent.GameFlags & TurnMask) ^ TurnMask), // flip the turn
+		Flags:         TerminalFlag(terminated), // flip the turn
 	}
 }
 
 func (node *NodeBase[T]) AvgOutcome() Result {
-	node.statsMutex.RLock()
-	defer node.statsMutex.RUnlock()
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
 	return node.outcomes / Result(node.visits)
 }
 
 func (node *NodeBase[T]) Outcomes() Result {
-	node.statsMutex.RLock()
-	defer node.statsMutex.RUnlock()
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
 	return node.outcomes
 }
 
 func (node *NodeBase[T]) AddOutcome(result Result) {
-	node.statsMutex.Lock()
+	node.nodeMutex.Lock()
 	node.outcomes += result
-	node.statsMutex.Unlock()
+	node.nodeMutex.Unlock()
 }
 
 func (node *NodeBase[T]) Visits() int32 {
-	node.statsMutex.RLock()
-	defer node.statsMutex.RUnlock()
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
 
 	return node.visits
 }
 
 func (node *NodeBase[T]) VirtualLoss() int32 {
-	node.statsMutex.RLock()
-	defer node.statsMutex.RUnlock()
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
 
 	return node.virtualLoss
 }
@@ -116,8 +116,8 @@ func (node *NodeBase[T]) VirtualLoss() int32 {
 // Get both visits and virtual loss (to avoid situtation one of them is modified)
 // returns (visits, virtual loss)
 func (node *NodeBase[T]) GetVvl() (int32, int32) {
-	node.statsMutex.RLock()
-	defer node.statsMutex.RUnlock()
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
 
 	return node.visits, node.virtualLoss
 }
@@ -130,73 +130,86 @@ func (node *NodeBase[T]) RealVisits() int32 {
 
 // Adds VirtuaLoss to both visits and virtual loss counters
 func (node *NodeBase[T]) AddVvl(visits, virtualLoss int32) {
-	node.statsMutex.Lock()
+	node.nodeMutex.Lock()
 
 	node.visits += visits
 	node.virtualLoss += virtualLoss
 
-	node.statsMutex.Unlock()
+	node.nodeMutex.Unlock()
 }
 
 // Sets visits and virtual loss of this node to specified value
 func (node *NodeBase[T]) SetVvl(visits, virtualLoss int32) {
-	node.statsMutex.Lock()
+	node.nodeMutex.Lock()
 
 	node.visits = visits
 	node.virtualLoss = virtualLoss
 
-	node.statsMutex.Unlock()
+	node.nodeMutex.Unlock()
 }
 
-// Reads the game flags, and return wheter the node is terminal
+// Reads the game Flags, and return wheter the node is terminal
 func (node *NodeBase[T]) Terminal() bool {
-	return node.GameFlags&TerminalMask == TerminalMask
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
+	return node.Flags&TerminalMask == TerminalMask
 }
 
-func (node *NodeBase[T]) Turn() bool {
-	return node.GameFlags&TurnMask == TurnMask
+func (node *NodeBase[T]) SetFlag(flag NodeFlags) {
+	node.nodeMutex.Lock()
+	node.Flags |= flag
+	node.nodeMutex.Unlock()
 }
 
-func (node *NodeBase[T]) SetFlag(flag GameFlags) {
-	node.GameFlags |= flag
-}
-
-func TurnFlag(turn bool) GameFlags {
-	flag := GameFlags(0)
-	if turn {
-		flag |= 1
-	}
-	return flag
-}
-
-func TerminalFlag(terminal bool) GameFlags {
-	flag := GameFlags(0)
+func TerminalFlag(terminal bool) NodeFlags {
+	flag := NodeFlags(0)
 	if terminal {
-		flag |= 2
+		flag |= TerminalMask
 	}
 	return flag
 }
 
 // Same as asking if the node has chidlren
 func (node *NodeBase[T]) Expanded() bool {
-	return node.state.Load() == 2
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
+
+	return node.Flags&ExpandedMask == ExpandedMask
 }
 
 // See if currenlty node is being expanded
 func (node *NodeBase[T]) Expanding() bool {
-	return node.state.Load() == 1
+	node.nodeMutex.RLock()
+	defer node.nodeMutex.RUnlock()
+
+	return node.Flags&ExpandingMask == ExpandingMask
 }
 
 // Should be called when we want to expand this node,
 // if it's possible, sets the internal flag to 'currently expanding'
 func (node *NodeBase[T]) CanExpand() bool {
-	return node.state.CompareAndSwap(0, 1)
+	// TODO:
+	// This is causing the concurrent threads to deadlock in 'Expanding' loop
+	node.nodeMutex.RLock()
+	canExpand := node.Flags == 0
+
+	if canExpand {
+		node.nodeMutex.RUnlock()
+		node.nodeMutex.Lock()
+		node.Flags = ExpandingMask
+		node.nodeMutex.Unlock()
+	} else {
+		node.nodeMutex.RUnlock()
+	}
+	return canExpand
 }
 
 // After successful 'CanExpand' call, use this function to set
 // the state of the node to 'expanded'
 func (node *NodeBase[T]) FinishExpanding() {
-	node.state.CompareAndSwap(1, 2)
+	node.nodeMutex.Lock()
+	node.Flags = ExpandedMask // all flags are mutually exclusive
+	node.nodeMutex.Unlock()
 }
 
 type GameOperations[T MoveLike] interface {
@@ -238,19 +251,20 @@ type MCTS[T MoveLike] struct {
 func NewMTCS[T MoveLike](
 	selectionPolicy SelectionPolicy[T],
 	operations GameOperations[T],
-	flags GameFlags,
+	flags NodeFlags,
 ) *MCTS[T] {
 	mcts := &MCTS[T]{
 		TreeStats:        TreeStats{},
 		listener:         &StatsListener[T]{},
 		Limiter:          LimiterLike(NewLimiter(uint32(unsafe.Sizeof(NodeBase[T]{})))),
 		selection_policy: selectionPolicy,
-		Root:             &NodeBase[T]{GameFlags: flags},
+		Root:             &NodeBase[T]{Flags: flags},
 	}
 
 	// Set IsThinking to false
 	mcts.Limiter.Stop()
-	mcts.Root.state.Store(2)
+	mcts.Root.CanExpand()
+	mcts.Root.FinishExpanding()
 	mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
 	return mcts
 }
@@ -370,6 +384,7 @@ func (mcts *MCTS[T]) RootScore() Result {
 func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeBase[T] {
 	var bestChild *NodeBase[T]
 	var child *NodeBase[T]
+	maxVisits := 0
 
 	// DEBUG
 	// rootTurn := mcts.Root.Turn() == node.Turn()
@@ -389,7 +404,6 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 
 	switch policy {
 	case BestChildMostVisits:
-		maxVisits := 0
 		for i := 0; i < len(node.Children); i++ {
 			child = &node.Children[i]
 			if v := int(child.RealVisits()); v > maxVisits && v > 0 {
@@ -407,7 +421,6 @@ func (mcts *MCTS[T]) BestChild(node *NodeBase[T], policy BestChildPolicy) *NodeB
 		bestWinRate := -1.0
 
 		// Get max visits out the children
-		maxVisits := 0
 		for i := 0; i < len(node.Children); i++ {
 			maxVisits = max(int(node.Children[i].Visits()), maxVisits)
 		}

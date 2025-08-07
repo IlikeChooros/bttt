@@ -16,7 +16,7 @@ type Position struct {
 	stateList        *StateList       // history of the position (for MakeMove, UndoMove)
 	nextBigIndex     PosType
 	termination      Termination
-	hash             uint64 // Current hash of the position
+	// hash             uint64 // Current hash of the position
 }
 
 // Create a heap-allocated, initialized Big Tic Tac Toe position
@@ -32,7 +32,7 @@ func (p *Position) Clone() Position {
 		stateList:    NewStateList(),
 		nextBigIndex: p.nextBigIndex,
 		termination:  p.termination,
-		hash:         p.hash,
+		// hash:         p.hash,
 	}
 
 	for i := range 9 {
@@ -52,14 +52,14 @@ func (p *Position) Clone() Position {
 // Initialize the position
 func (p *Position) Init() {
 	p.stateList = NewStateList()
-	p.hash = p.Hash()
+	// p.hash = p.Hash()
 	p.nextBigIndex = PosIndexIllegal
 }
 
 func (p *Position) Reset() {
 	p.stateList.Clear()
 	p.termination = TerminationNone
-	p.hash = 0
+	// p.hash = 0
 	p.nextBigIndex = PosIndexIllegal
 
 	// Zero the board
@@ -116,7 +116,7 @@ func (pos *Position) SetupBoardState() {
 		pos.nextBigIndex = PosIndexIllegal
 	}
 
-	pos.hash = pos.Hash()
+	// pos.hash = pos.Hash()
 }
 
 // Getters
@@ -132,22 +132,22 @@ func (p *Position) BigIndex() PosType {
 	return p.nextBigIndex
 }
 
-func (p *Position) _UpdateBigPosHash(state PositionState, bigIndex PosType) {
-	// Update the hash
-	idx := -1
-	switch state {
-	case PositionCrossWon:
-		idx = 1
-	case PositionCircleWon:
-		idx = 0
-	case PositionDraw:
-		idx = 2
-	}
+// func (p *Position) _UpdateBigPosHash(state PositionState, bigIndex PosType) {
+// 	// Update the hash
+// 	idx := -1
+// 	switch state {
+// 	case PositionCrossWon:
+// 		idx = 1
+// 	case PositionCircleWon:
+// 		idx = 0
+// 	case PositionDraw:
+// 		idx = 2
+// 	}
 
-	if idx != -1 {
-		p.hash ^= _hashBigPosState[idx][bigIndex]
-	}
-}
+// 	if idx != -1 {
+// 		p.hash ^= _hashBigPosState[idx][bigIndex]
+// 	}
+// }
 
 // Verifies legality of given move, then if it's valid, make's it on the board
 func (p *Position) MakeLegalMove(move PosType) error {
@@ -203,21 +203,21 @@ func (p *Position) MakeMove(move PosType) {
 	}
 
 	// Update hash
-	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
-	p.hash ^= _hashTurn
+	// p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
+	// p.hash ^= _hashTurn
 
 	// Remove previous big index hash
-	if p.nextBigIndex != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[p.nextBigIndex]
-	}
+	// if p.nextBigIndex != PosIndexIllegal {
+	// p.hash ^= _hashBigIndex[p.nextBigIndex]
+	// }
 
 	// Set new 'big index'
-	if nextBigIndex != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[nextBigIndex]
-	}
+	// if nextBigIndex != PosIndexIllegal {
+	// p.hash ^= _hashBigIndex[nextBigIndex]
+	// }
 
 	// Update the big position state hash
-	p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
+	// p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
 
 	// Append new state
 	p.stateList.Append(move, !p.stateList.Last().turn, posStateBefore, p.nextBigIndex)
@@ -241,18 +241,18 @@ func (p *Position) UndoMove() {
 	p.bitboards[index][bigIndex] ^= (1 << smallIndex)
 
 	// Remove piece, turn and bigIndex hash
-	p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
-	p.hash ^= _hashTurn
+	// p.hash ^= _hashSmallBoard[index][bigIndex][smallIndex]
+	// p.hash ^= _hashTurn
 
-	if p.nextBigIndex != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[p.nextBigIndex]
-	}
+	// if p.nextBigIndex != PosIndexIllegal {
+	// p.hash ^= _hashBigIndex[p.nextBigIndex]
+	// }
 
 	// If this move had changed the big position state, update the hash
 	// (last move terminated that tic tac toe board, so we should undo the state hash)
-	if lastState.thisPositionState != p.bigPositionState[bigIndex] {
-		p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
-	}
+	// if lastState.thisPositionState != p.bigPositionState[bigIndex] {
+	// p._UpdateBigPosHash(p.bigPositionState[bigIndex], bigIndex)
+	// }
 
 	// Restore bigPositionState
 	p.bigPositionState[bigIndex] = lastState.thisPositionState
@@ -265,9 +265,9 @@ func (p *Position) UndoMove() {
 	p.stateList.Remove()
 
 	// Add previous big index hash
-	if p.nextBigIndex != PosIndexIllegal {
-		p.hash ^= _hashBigIndex[p.nextBigIndex]
-	}
+	// if p.nextBigIndex != PosIndexIllegal {
+	// p.hash ^= _hashBigIndex[p.nextBigIndex]
+	// }
 }
 
 // Get the 'big position state'

@@ -120,7 +120,7 @@ I have tried:
 - [ ] Remove hashing of the positions, since no hash table is used in MCTS 
 - [x] Fix: In multithreaded search, 'maxdepth' may be called twice on the same depth increase
   - Expected: Each 'depth increase' should be called only once 
-- [ ] Add multi-pv support
+- [x] Add multi-pv support
 
 ### Add-ons
 - [x] Add statistics listener interface:

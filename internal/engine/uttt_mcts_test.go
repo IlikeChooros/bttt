@@ -44,7 +44,7 @@ func TestMCTSExpansion(t *testing.T) {
 	// Create a root node
 	root := &mcts.NodeBase[PosType]{
 		// Non-zero visits to trigger expansion
-		GameFlags: mcts.TerminalFlag(false),
+		Flags: mcts.TerminalFlag(false),
 	}
 	root.SetVvl(0, 0)
 
@@ -174,7 +174,7 @@ func TestMCTSBackpropagation(t *testing.T) {
 
 	// Test backpropagation with win
 	originalNotation := pos.Notation()
-	tree.Backpropagate(child, 1)
+	tree.Backpropagate(child, 0)
 
 	// Check statistics
 	if child.Visits() != 1 {
@@ -337,7 +337,7 @@ func TestMCTSMultiThreadedSearch(t *testing.T) {
 	}
 
 	engine := NewUtttMCTS(*pos)
-	engine.Limits().SetThreads(4).SetNodes(20000)
+	engine.Limits().SetThreads(4).SetCycles(40000)
 	engine.Search()
 
 	result, _ := engine.SearchResult(mcts.BestChildWinRate).MainLine()
@@ -362,7 +362,7 @@ func BenchmarkMCTSRollout(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	ops := &UtttOperations{position: *pos}
+	ops := newUtttOps(*pos)
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

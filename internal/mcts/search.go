@@ -19,13 +19,15 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 	index := 0
 	parentVisits := parent.Visits()
 	var child *NodeBase[T]
+	var actualVisits, visits, vl int32
+	var wins Result
 
 	for i := 0; i < len(parent.Children); i++ {
 
 		// Get the variables
 		child = &parent.Children[i]
-		visits, vl := child.GetVvl()
-		actualVisits := visits - vl
+		visits, vl = child.GetVvl()
+		actualVisits = visits - vl
 
 		// Pick the unvisited one
 		if actualVisits == 0 {
@@ -33,7 +35,7 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 			return child
 		}
 
-		wins := child.Outcomes()
+		wins = child.Outcomes()
 
 		// UCB 1 : wins/visits + C * sqrt(ln(parent_visits)/visits)
 		// ucb1 = epliotation + exploration
@@ -116,8 +118,7 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 		// Choose the most promising node
 		node = mcts.Selection(ops, threadRand, threadId)
 		// Get the result of the rollout/playout
-		result := ops.Rollout()
-		mcts.Backpropagate(ops, node, result)
+		mcts.Backpropagate(ops, node, ops.Rollout())
 
 		// Store the nps
 		mcts.nps.Store(mcts.nodes.Load() * 1000 / mcts.Limiter.Elapsed())

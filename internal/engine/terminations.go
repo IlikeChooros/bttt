@@ -58,11 +58,11 @@ func _isFilled[T comparable](arr []T, none T) bool {
 func _checkSquareTermination(crossbb, circlebb uint) PositionState {
 
 	// See if there is any winning patterns
-	for _, pattern := range _winningBitboardPatterns {
-		if crossbb&pattern == pattern {
+	for i := 0; i < 8; i++ {
+		if crossbb&_winningBitboardPatterns[i] == _winningBitboardPatterns[i] {
 			return PositionCrossWon
 		}
-		if circlebb&pattern == pattern {
+		if circlebb&_winningBitboardPatterns[i] == _winningBitboardPatterns[i] {
 			return PositionCircleWon
 		}
 	}
@@ -80,10 +80,12 @@ func (pos *Position) CheckTerminationPattern() {
 	// Assuming we correctly updated 'bigPositionState' (with the _checkSquareTermination)
 
 	// Check winning conditions for all patterns
-	for _, pattern := range _patterns {
+	// removed refrence by value, since that results in a copy of [3]int array, which slows down
+	// this function by 100%
+	for i := 0; i < 8; i++ {
 		// Check this pattern, and resolve it
-		if v := pos.bigPositionState[pattern[0]]; v == pos.bigPositionState[pattern[1]] &&
-			pos.bigPositionState[pattern[1]] == pos.bigPositionState[pattern[2]] &&
+		if v := pos.bigPositionState[_patterns[i][0]]; v == pos.bigPositionState[_patterns[i][1]] &&
+			pos.bigPositionState[_patterns[i][1]] == pos.bigPositionState[_patterns[i][2]] &&
 			v != PositionUnResolved && v != PositionDraw {
 
 			// Got a winner

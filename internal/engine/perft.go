@@ -26,7 +26,7 @@ func Perft(pos *Position, depth int, valid bool, print bool) uint64 {
 			nodes = _ValidPerft(pos, depth)
 		}
 	} else {
-		nodes = _Perft(pos, depth, true)
+		nodes = _Perft(pos, depth, print)
 	}
 
 	return nodes
@@ -42,8 +42,8 @@ func _ValidPerft(position *Position, depth int) uint64 {
 	nodes := uint64(0)
 	moves := position.GenerateMoves().Slice()
 
-	for _, m := range moves {
-		position.MakeMove(m)
+	for i := range moves {
+		position.MakeMove(moves[i])
 
 		if !position.IsTerminated() {
 			nodes += _ValidPerft(position, depth-1)
@@ -67,16 +67,17 @@ func _Perft(position *Position, depth int, root bool) uint64 {
 	// Simply count number of 'children' nodes from this position, recursively
 	nodes := uint64(0)
 	moves := position.GenerateMoves()
+	sl := moves.Slice()
 
 	// If that's a root, print number of legal moves from each node
 	if root {
-		for _, m := range moves.Slice() {
-			position.MakeMove(m)
+		for i := range sl {
+			position.MakeMove(sl[i])
 			n := _Perft(position, depth-1, false)
 			position.UndoMove()
 			nodes += n
 
-			fmt.Printf("%s: %d\n", m.String(), n)
+			fmt.Printf("%s: %d\n", sl[i].String(), n)
 		}
 
 		return nodes
@@ -87,8 +88,8 @@ func _Perft(position *Position, depth int, root bool) uint64 {
 		return uint64(moves.size)
 	}
 
-	for _, m := range moves.Slice() {
-		position.MakeMove(m)
+	for i := range sl {
+		position.MakeMove(sl[i])
 		nodes += _Perft(position, depth-1, false)
 		position.UndoMove()
 	}

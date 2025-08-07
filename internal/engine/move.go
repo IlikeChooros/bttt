@@ -14,9 +14,7 @@ type MoveList struct {
 
 // Make a new move list struct
 func NewMoveList() *MoveList {
-	mv := new(MoveList)
-	mv.size = 0
-	return mv
+	return &MoveList{}
 }
 
 func ToMoveList(moves []PosType) *MoveList {
@@ -47,7 +45,8 @@ func (ml *MoveList) Size() int {
 
 // Appends a new move to the list of moves
 func (ml *MoveList) Append(bigIndex, smallIndex int) {
-	ml.moves[ml.size] = MakeMove(bigIndex, smallIndex)
+	// This is a critical function, don't use MakeMove here
+	ml.moves[ml.size] = PosType((smallIndex & _moveSmallIndexMask) | ((bigIndex << 4) & _moveBigIndexMask))
 	ml.size++
 }
 

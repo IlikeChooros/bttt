@@ -171,3 +171,23 @@ func TestSmallSquareTermination(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkTerminationPattern(b *testing.B) {
+	pos := NewPosition()
+	_ = pos.FromNotation(StartingPosition)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pos.CheckTerminationPattern()
+	}
+}
+
+func BenchmarkIsTerminated(b *testing.B) {
+	pos := NewPosition()
+	_ = pos.FromNotation(StartingPosition)
+	b.ResetTimer()
+
+	for i := 0; i < b.N; i++ {
+		pos.IsTerminated()
+	}
+}

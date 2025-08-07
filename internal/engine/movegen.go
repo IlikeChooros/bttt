@@ -11,7 +11,7 @@ func (pos *Position) GenerateMoves() *MoveList {
 
 	// If there is no history, we can choose also the 'Big Index' position
 	if pos.BigIndex() == PosIndexIllegal {
-		for bigIndex := range 9 {
+		for bigIndex := 0; bigIndex < 9; bigIndex++ {
 			if pos.bigPositionState[bigIndex] != PositionUnResolved {
 				continue
 			}

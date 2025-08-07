@@ -125,38 +125,38 @@ func (cli *Cli) parseArgument(arg string) error {
 	return nil
 }
 
-func hashTest(depth int, pos *Position, tt *HashTable[HashEntryBase]) (uint, uint) {
+// func hashTest(depth int, pos *Position, tt *HashTable[HashEntryBase]) (uint, uint) {
 
-	if depth == 0 {
+// 	if depth == 0 {
 
-		if val, _ := tt.Get(pos.hash); val.Hash != 0 {
-			// Check if that's a collision
-			if pos.hash != val.Hash {
-				return 1, 1
-			}
-		} else {
-			// That's an empty key, set this new value
-			tt.SetForced(pos.hash, HashEntryBase{Depth: depth, Hash: pos.hash})
-		}
+// 		if val, _ := tt.Get(pos.hash); val.Hash != 0 {
+// 			// Check if that's a collision
+// 			if pos.hash != val.Hash {
+// 				return 1, 1
+// 			}
+// 		} else {
+// 			// That's an empty key, set this new value
+// 			tt.SetForced(pos.hash, HashEntryBase{Depth: depth, Hash: pos.hash})
+// 		}
 
-		return 1, 0
-	}
+// 		return 1, 0
+// 	}
 
-	// Go through the moves
-	nodes, collisions := uint(0), uint(0)
-	moves := pos.GenerateMoves().Slice()
+// 	// Go through the moves
+// 	nodes, collisions := uint(0), uint(0)
+// 	moves := pos.GenerateMoves().Slice()
 
-	for _, m := range moves {
-		pos.MakeMove(m)
-		n, c := hashTest(depth-1, pos, tt)
-		pos.UndoMove()
+// 	for _, m := range moves {
+// 		pos.MakeMove(m)
+// 		n, c := hashTest(depth-1, pos, tt)
+// 		pos.UndoMove()
 
-		nodes += n
-		collisions += c
-	}
+// 		nodes += n
+// 		collisions += c
+// 	}
 
-	return nodes, collisions
-}
+// 	return nodes, collisions
+// }
 
 func (cli *Cli) handleTest(tokens []string) error {
 	// Test the move generation
@@ -184,15 +184,15 @@ func (cli *Cli) handleTest(tokens []string) error {
 	}
 
 	// Test hasing values, by performing perft test up to certain depth, and see how many collisions we get
-	if tokens[0] == "hash" {
-		return _parseIntToken(1, tokens, func(i int) {
-			tt := NewHashTable[HashEntryBase](1 << 20)
-			nodes, collisions := hashTest(i, cli.engine.Position(), tt)
+	// if tokens[0] == "hash" {
+	// 	return _parseIntToken(1, tokens, func(i int) {
+	// 		tt := NewHashTable[HashEntryBase](1 << 20)
+	// 		nodes, collisions := hashTest(i, cli.engine.Position(), tt)
 
-			fmt.Printf("HashTest: %d nodes %d collisions (%.3f) load factor: %.3f\n",
-				nodes, collisions, float64(collisions)/float64(nodes), tt.LoadFactor())
-		})
-	}
+	// 		fmt.Printf("HashTest: %d nodes %d collisions (%.3f) load factor: %.3f\n",
+	// 			nodes, collisions, float64(collisions)/float64(nodes), tt.LoadFactor())
+	// 	})
+	// }
 
 	return nil
 }

@@ -51,9 +51,9 @@ func compare(mvpos, pos *Position) error {
 	if mvpos.termination != pos.termination {
 		return fmt.Errorf("Termination ineq got=%v, want=%v", mvpos.termination, pos.termination)
 	}
-	if mvpos.hash != pos.hash {
-		return fmt.Errorf("Hash inequality got=%d, want=%d", mvpos.hash, pos.hash)
-	}
+	// if mvpos.hash != pos.hash {
+	// return fmt.Errorf("Hash inequality got=%d, want=%d", mvpos.hash, pos.hash)
+	// }
 	if !reflect.DeepEqual(mvpos.position, pos.position) {
 		return fmt.Errorf("Position inequality got=%v, want=%v", mvpos.position, pos.position)
 	}
