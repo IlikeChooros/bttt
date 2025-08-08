@@ -36,23 +36,21 @@ type SelectionPolicy[T MoveLike] func(parent, root *NodeBase[T]) *NodeBase[T]
 // wins, and losses should be accessed only with atomic operations
 // However to read the visit and virtual loss counts, use the methods
 type NodeStats struct {
-	outcomes Result // float64 value of compounded outcomes for this node
+	sumOutcomes atomic.Uint64 // float64 value of compounded outcomes for this node with 10^-3 precision
 
 	// This is visit counter, it cannot be read by atomic, use GetVvl() Visits() to properly read this value
-	visits int32
+	visits atomic.Int32
 
 	// Current virtual loss applied to visits, it always meets condition: visits - virtualLoss >= 0.
 	// Read this value ONLY with GetVvl() or VirtualLoss() methods
-	virtualLoss int32
+	virtualLoss atomic.Int32
 }
 
-type NodeFlags uint8
-
 const (
-	CanExpand     NodeFlags = 0
-	ExpandingMask NodeFlags = 1
-	ExpandedMask  NodeFlags = 2
-	TerminalMask  NodeFlags = 4
+	CanExpand     uint32 = 0
+	ExpandingMask uint32 = 1
+	ExpandedMask  uint32 = 2
+	TerminalMask  uint32 = 4
 )
 
 type NodeBase[T MoveLike] struct {
@@ -61,8 +59,8 @@ type NodeBase[T MoveLike] struct {
 	Children      []NodeBase[T]
 	Parent        *NodeBase[T]
 	// Synchornizes read/write on visits, virtual loss and outcomes
-	nodeMutex sync.RWMutex
-	Flags     NodeFlags
+	// nodeMutex sync.RWMutex
+	Flags uint32 // must be read/written atomically
 }
 
 func newRootNode[T MoveLike](terminated bool) *NodeBase[T] {
@@ -82,44 +80,38 @@ func NewBaseNode[T MoveLike](parent *NodeBase[T], signature T, terminated bool) 
 }
 
 func (node *NodeBase[T]) AvgOutcome() Result {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-	return node.outcomes / Result(node.visits)
+	return Result(node.sumOutcomes.Load()) / 1e3 / Result(node.Visits())
 }
 
 func (node *NodeBase[T]) Outcomes() Result {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-	return node.outcomes
+	return Result(node.sumOutcomes.Load()) / 1e3
 }
 
 func (node *NodeBase[T]) AddOutcome(result Result) {
-	node.nodeMutex.Lock()
-	node.outcomes += result
-	node.nodeMutex.Unlock()
+	node.sumOutcomes.Add(uint64(result * 1e3))
 }
 
 func (node *NodeBase[T]) Visits() int32 {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-
-	return node.visits
+	return node.visits.Load()
 }
 
 func (node *NodeBase[T]) VirtualLoss() int32 {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-
-	return node.virtualLoss
+	return node.virtualLoss.Load()
 }
 
 // Get both visits and virtual loss (to avoid situtation one of them is modified)
 // returns (visits, virtual loss)
 func (node *NodeBase[T]) GetVvl() (int32, int32) {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
+	// cas loop, so we can read the values atomically
+	for {
+		visits := node.visits.Load()
+		virtualLoss := node.virtualLoss.Load()
 
-	return node.visits, node.virtualLoss
+		// Always preserve the condition that actual visits >= 0
+		if virtualLoss <= visits {
+			return visits, virtualLoss
+		}
+	}
 }
 
 // Returns visits - virtual loss
@@ -130,39 +122,32 @@ func (node *NodeBase[T]) RealVisits() int32 {
 
 // Adds VirtuaLoss to both visits and virtual loss counters
 func (node *NodeBase[T]) AddVvl(visits, virtualLoss int32) {
-	node.nodeMutex.Lock()
-
-	node.visits += visits
-	node.virtualLoss += virtualLoss
-
-	node.nodeMutex.Unlock()
+	node.virtualLoss.Add(virtualLoss)
+	node.visits.Add(visits)
 }
 
 // Sets visits and virtual loss of this node to specified value
 func (node *NodeBase[T]) SetVvl(visits, virtualLoss int32) {
-	node.nodeMutex.Lock()
+	node.virtualLoss.Store(virtualLoss)
+	node.visits.Store(visits)
 
-	node.visits = visits
-	node.virtualLoss = virtualLoss
-
-	node.nodeMutex.Unlock()
+	// If the virtual loss is greater than visits, we have a problem
+	if virtualLoss > visits {
+		panic(fmt.Sprintf("Virtual loss (%d) cannot be greater than visits (%d)", virtualLoss, visits))
+	}
 }
 
 // Reads the game Flags, and return wheter the node is terminal
 func (node *NodeBase[T]) Terminal() bool {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-	return node.Flags&TerminalMask == TerminalMask
+	return atomic.LoadUint32(&node.Flags)&TerminalMask == TerminalMask
 }
 
-func (node *NodeBase[T]) SetFlag(flag NodeFlags) {
-	node.nodeMutex.Lock()
-	node.Flags |= flag
-	node.nodeMutex.Unlock()
+func (node *NodeBase[T]) SetFlag(flag uint32) {
+	atomic.StoreUint32(&node.Flags, flag)
 }
 
-func TerminalFlag(terminal bool) NodeFlags {
-	flag := NodeFlags(0)
+func TerminalFlag(terminal bool) uint32 {
+	flag := uint32(0)
 	if terminal {
 		flag |= TerminalMask
 	}
@@ -171,18 +156,12 @@ func TerminalFlag(terminal bool) NodeFlags {
 
 // Same as asking if the node has chidlren
 func (node *NodeBase[T]) Expanded() bool {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-
-	return node.Flags&ExpandedMask == ExpandedMask
+	return atomic.LoadUint32(&node.Flags)&ExpandedMask == ExpandedMask
 }
 
 // See if currenlty node is being expanded
 func (node *NodeBase[T]) Expanding() bool {
-	node.nodeMutex.RLock()
-	defer node.nodeMutex.RUnlock()
-
-	return node.Flags&ExpandingMask == ExpandingMask
+	return atomic.LoadUint32(&node.Flags)&ExpandingMask == ExpandingMask
 }
 
 // Should be called when we want to expand this node,
@@ -190,26 +169,13 @@ func (node *NodeBase[T]) Expanding() bool {
 func (node *NodeBase[T]) CanExpand() bool {
 	// TODO:
 	// This is causing the concurrent threads to deadlock in 'Expanding' loop
-	node.nodeMutex.RLock()
-	canExpand := node.Flags == 0
-
-	if canExpand {
-		node.nodeMutex.RUnlock()
-		node.nodeMutex.Lock()
-		node.Flags = ExpandingMask
-		node.nodeMutex.Unlock()
-	} else {
-		node.nodeMutex.RUnlock()
-	}
-	return canExpand
+	return atomic.CompareAndSwapUint32(&node.Flags, CanExpand, ExpandingMask)
 }
 
 // After successful 'CanExpand' call, use this function to set
 // the state of the node to 'expanded'
 func (node *NodeBase[T]) FinishExpanding() {
-	node.nodeMutex.Lock()
-	node.Flags = ExpandedMask // all flags are mutually exclusive
-	node.nodeMutex.Unlock()
+	atomic.StoreUint32(&node.Flags, ExpandedMask)
 }
 
 type GameOperations[T MoveLike] interface {
@@ -245,13 +211,14 @@ type MCTS[T MoveLike] struct {
 	Root             *NodeBase[T]
 	size             atomic.Uint32
 	wg               sync.WaitGroup
+	collisionCount   atomic.Int32
 }
 
 // Create new base tree
 func NewMTCS[T MoveLike](
 	selectionPolicy SelectionPolicy[T],
 	operations GameOperations[T],
-	flags NodeFlags,
+	flags uint32,
 ) *MCTS[T] {
 	mcts := &MCTS[T]{
 		TreeStats:        TreeStats{},
@@ -263,9 +230,15 @@ func NewMTCS[T MoveLike](
 
 	// Set IsThinking to false
 	mcts.Limiter.Stop()
-	mcts.Root.CanExpand()
-	mcts.Root.FinishExpanding()
-	mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
+
+	// Expand the root node, by default
+	if mcts.Root.CanExpand() {
+		mcts.Root.FinishExpanding()
+		mcts.size.Store(1 + operations.ExpandNode(mcts.Root))
+	} else {
+		mcts.size.Store(1)
+	}
+
 	return mcts
 }
 
@@ -273,6 +246,21 @@ func (mcts *MCTS[T]) invokeListener(f ListenerFunc[T]) {
 	if f != nil {
 		f(toListenerStats(mcts))
 	}
+}
+
+// Get the collision count, which is the number of times
+// the node was chosen, but it was already being expanded
+// resulting in a 'waiting' state
+func (mcts *MCTS[T]) CollisionCount() int32 {
+	return mcts.collisionCount.Load()
+}
+
+// Number of all collisions in the tree divided by the number of all cycles
+func (mcts *MCTS[T]) CollisionFactor() float64 {
+	if mcts.Nodes() == 0 {
+		return 0.0
+	}
+	return float64(mcts.collisionCount.Load()) / float64(mcts.Root.Visits())
 }
 
 func (mcts *MCTS[T]) ResetListener() {
@@ -511,6 +499,11 @@ func (mcts *MCTS[T]) PvNodes(root *NodeBase[T], policy BestChildPolicy, includeR
 
 	if includeRoot {
 		pv = append(pv, root)
+	}
+
+	if len(root.Children) == 0 {
+		// If there are no children, we cannot go further
+		return pv, root.Terminal()
 	}
 
 	// Simply select 'best child' until we don't have any children

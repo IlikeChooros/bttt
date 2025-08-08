@@ -20,7 +20,7 @@ func TestMates(t *testing.T) {
 	// Positive means winning for the X, negative - O
 	// for the opponent
 	mate_depths := []int{
-		2, 1, 1,
+		-2, 1, 1,
 	}
 
 	engine := NewEngine()

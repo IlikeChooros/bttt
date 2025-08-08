@@ -3,6 +3,7 @@ package mcts
 import (
 	"math"
 	"math/rand"
+	"runtime"
 	"time"
 )
 
@@ -17,7 +18,7 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 
 	max := float64(-1)
 	index := 0
-	parentVisits := parent.Visits()
+	lnParentVisits := math.Log(float64(parent.Visits()))
 	var child *NodeBase[T]
 	var actualVisits, visits, vl int32
 	var wins Result
@@ -42,7 +43,7 @@ func UCB1[T MoveLike](parent, root *NodeBase[T]) *NodeBase[T] {
 		// Since we assume the game is zero-sum, we want to expand the tree's nodes
 		// that have best value according to the root
 		ucb1 := float64(wins)/float64(visits) +
-			threadExploration*math.Sqrt(math.Log(float64(parentVisits))/float64(visits))
+			threadExploration*math.Sqrt(lnParentVisits/float64(visits))
 
 		if ucb1 > max {
 			max = ucb1
@@ -70,8 +71,7 @@ func (mcts *MCTS[T]) SearchMultiThreaded(ops GameOperations[T]) {
 	// } else {
 	// 	threadExploration = ExplorationParam
 	// }
-	VirtualLoss = 1 + (int32(threads)-1)*20
-	// VirtualLoss = 5
+	VirtualLoss = 2
 
 	for id := range threads {
 		mcts.wg.Add(1)
@@ -159,7 +159,14 @@ func (mcts *MCTS[T]) Selection(ops GameOperations[T], threadRand *rand.Rand, thr
 		}
 
 		// Currently expanding
+		first := true
 		for node.Expanding() {
+			if first {
+				// If this is the first time, increment the collision counter
+				mcts.collisionCount.Add(1)
+				first = false
+			}
+			runtime.Gosched()
 		}
 
 		// Already set
