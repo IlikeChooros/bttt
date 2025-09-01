@@ -71,7 +71,7 @@ func (mcts *UtttMCTS) SetNotation(notation string) error {
 	return mcts.ops.position.FromNotation(notation)
 }
 
-func ToSearchResult(stats mcts.ListenerTreeStats[PosType]) SearchResult {
+func ToSearchResult(stats mcts.ListenerTreeStats[PosType], turn TurnType) SearchResult {
 
 	result := SearchResult{
 		Nodes:  0,
@@ -79,6 +79,7 @@ func ToSearchResult(stats mcts.ListenerTreeStats[PosType]) SearchResult {
 		Depth:  stats.Maxdepth,
 		Cycles: int32(stats.Cycles),
 		Lines:  make([]EngineLine, len(stats.Lines)),
+		Turn:   turn,
 	}
 
 	for i := range len(stats.Lines) {
@@ -118,6 +119,7 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 		Depth:  mcts.MaxDepth(),
 		Cycles: mcts.Root.Visits(),
 		Lines:  make([]EngineLine, len(multipv)),
+		Turn:   mcts.ops.rootSide,
 	}
 
 	for i := range len(multipv) {

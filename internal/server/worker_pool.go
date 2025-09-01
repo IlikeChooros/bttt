@@ -18,10 +18,10 @@ type AnalysisLine struct {
 }
 
 // Simply convert pv moves to pv strings, and convert eval to a string
-func ToAnalysisLine(engineLines []uttt.EngineLine) []AnalysisLine {
+func ToAnalysisLine(engineLines []uttt.EngineLine, turn uttt.TurnType) []AnalysisLine {
 	lines := make([]AnalysisLine, len(engineLines))
 	for i := range len(engineLines) {
-		lines[i].Eval = engineLines[i].StringValue()
+		lines[i].Eval = engineLines[i].StringValue(turn)
 		lines[i].Pv = make([]string, len(engineLines[i].Pv))
 		for j := range len(engineLines[i].Pv) {
 			lines[i].Pv[j] = engineLines[i].Pv[j].String()
@@ -238,7 +238,7 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) An
 
 	// Set the response object
 	return AnalysisResponse{
-		Lines: ToAnalysisLine(result.Lines),
+		Lines: ToAnalysisLine(result.Lines, engine.Position().Turn()),
 		Depth: result.Depth,
 		Nps:   result.Nps,
 		Final: true,

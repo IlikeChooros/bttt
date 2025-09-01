@@ -12,7 +12,6 @@ func main() {
 	engine.SetLimits(mcts.DefaultLimits().SetThreads(4).SetDepth(13).SetMbSize(16).SetMultiPv(3))
 	engine.SetNotation("8o/9/x8/9/6x2/9/2o6/9/x8 o 0")
 
-	// for {
 	fmt.Println(engine.Think())
 	fmt.Println(engine.MultiPv())
 

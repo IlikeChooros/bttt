@@ -2,6 +2,7 @@ package uttt
 
 import (
 	"fmt"
+	"math"
 	"unsafe"
 )
 
@@ -30,9 +31,15 @@ type EngineLine struct {
 }
 
 // Get the string representation of the value
-func (s EngineLine) StringValue() string {
+func (s EngineLine) StringValue(turn TurnType) string {
 	if s.ScoreType == MateScore {
-		return fmt.Sprintf("%dM", s.Value)
+		// we are winning
+		if s.Value > 0 {
+			return fmt.Sprintf("%d%cM", int(math.Abs(float64(s.Value))), turnToChar(turn))
+		}
+		// enemy is winning
+		return fmt.Sprintf("%d%cM", int(math.Abs(float64(s.Value))), turnToChar(!turn))
+
 	} else if s.Value == -1 {
 		return "0.5"
 	}
@@ -46,12 +53,13 @@ type SearchResult struct {
 	Nps    uint64
 	Depth  int
 	Cycles int32
+	Turn   TurnType
 }
 
 func (s SearchResult) String() string {
 	if len(s.Lines) > 0 {
 		return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
-			s.Lines[0].StringValue(), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
+			s.Lines[0].StringValue(s.Turn), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
 	}
 
 	return fmt.Sprintf("eval NaN depth %d nps %d nodes %d cycles %d pv empty",
@@ -95,6 +103,13 @@ const (
 	CircleTurn TurnType = false
 	CrossTurn  TurnType = true
 )
+
+func turnToChar(turn TurnType) rune {
+	if turn == CircleTurn {
+		return 'o'
+	}
+	return 'x'
+}
 
 // Create piece from a rune
 func PieceFromRune(square rune) PieceType {

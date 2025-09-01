@@ -7,12 +7,14 @@ import (
 	"uttt/internal/utils"
 
 	"github.com/joho/godotenv"
+	"golang.org/x/time/rate"
 )
 
 type Config struct {
 	Server ServerConfig
 	Pool   PoolConfig
 	Engine EngineConfig
+	Rate   RateLimitConfig
 }
 
 // Server config
@@ -39,6 +41,11 @@ type EngineConfig struct {
 	MaxSizeMb     int         `json:"mbsize"` // maximum size of the tree in mb
 	MaxMultiPv    int         `json:"multipv"`
 	Threads       int         `json:"threads"` // number of threads to use by default
+}
+
+type RateLimitConfig struct {
+	RequestsPerSecond rate.Limit
+	Burst             int
 }
 
 // Default configs
@@ -72,6 +79,10 @@ func LoadConfig() {
 			MaxSizeMb:     utils.GetEnvInt("MAX_TREE_SIZE_MB", 16),
 			Threads:       utils.GetEnvInt("N_SEARCH_THREADS", 4),
 			MaxMultiPv:    utils.GetEnvInt("MAX_MULTI_PV", 3),
+		},
+		Rate: RateLimitConfig{
+			RequestsPerSecond: rate.Limit(utils.GetEnvInt("RATE_LIMIT_RPS", 5)),
+			Burst:             utils.GetEnvInt("RATE_LIMIT_BURST", 8),
 		},
 	}
 

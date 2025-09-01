@@ -33,9 +33,10 @@ func LoggingMiddleware(logger *slog.Logger) func(http.Handler) http.Handler {
 				// 		"data", data,
 				// 	)
 				// } else {
+				ip, _ := GetRequestIPAddress(r)
 				logger.Info(
 					r.UserAgent(), r.Method, r.URL.Path,
-					r.RemoteAddr, GetRequestIPAddress(r),
+					r.RemoteAddr, ip,
 				)
 				// }
 			}()

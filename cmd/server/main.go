@@ -38,10 +38,11 @@ func main() {
 
 	// Create new router
 	router := mux.NewRouter()
+	router.Use(server.CorsMiddleware)
 	router.Use(server.TracingMiddleware)
 	router.Use(server.LoggingMiddleware(logger))
+	router.Use(server.RateLimiterMiddleware(logger))
 	router.Use(server.MetricsMiddleware)
-	router.Use(server.CorsMiddleware)
 
 	// API endpoints
 	router.HandleFunc("/analysis", server.AnalysisHandler(workerPool))              // analyze given position, up to 1 second for request

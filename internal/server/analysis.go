@@ -50,21 +50,20 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 
 		// Setup listeners & buffered channel
 		// resultCounter := atomic.Int32{}
+		turn, _ := uttt.ReadTurn(wsRequest.Position)
 		searchResults := make(chan AnalysisResponse, DefaultConfig.Engine.MaxDepth+1)
 		wsRequest.Response = make(chan AnalysisResponse)
 		wsRequest.Kill = make(chan bool)
 		wsRequest.Listener.
 			OnDepth(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
-				result := uttt.ToSearchResult(lts)
+				result := uttt.ToSearchResult(lts, turn)
 
 				response := AnalysisResponse{
-					Lines: ToAnalysisLine(result.Lines),
+					Lines: ToAnalysisLine(result.Lines, result.Turn),
 					Depth: result.Depth,
 					Nps:   result.Nps,
 					Final: false,
 				}
-
-				fmt.Println("Putting into sr queue")
 				searchResults <- response // Put it into channel queue, don't waste preciouse search time
 			}).
 			OnStop(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
