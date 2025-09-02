@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -127,7 +126,7 @@ func WsAnalysisHandler(workerPool *WorkerPool, logger *slog.Logger) http.Handler
 	}
 }
 
-func AnalysisHandler(workerPool *WorkerPool) http.HandlerFunc {
+func AnalysisHandler(workerPool *WorkerPool, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req AnalysisRequest
 
@@ -136,7 +135,7 @@ func AnalysisHandler(workerPool *WorkerPool) http.HandlerFunc {
 			return
 		}
 
-		fmt.Println("req=", req)
+		logger.Info("New post analysis", "req=", req)
 
 		req.Response = make(chan AnalysisResponse, 1)
 		req.Kill = make(chan bool)
@@ -150,6 +149,7 @@ func AnalysisHandler(workerPool *WorkerPool) http.HandlerFunc {
 		// Now wait for the analysis
 		select {
 		case resp := <-req.Response:
+			logger.Info("Sending response", "data", resp)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(resp)
 		case <-time.After(DefaultConfig.Pool.JobTimeout):

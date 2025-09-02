@@ -31,7 +31,7 @@ type EngineLine struct {
 }
 
 // Get the string representation of the value
-func (s EngineLine) StringValue(turn TurnType) string {
+func (s EngineLine) StringValue(turn TurnType, absValue bool) string {
 	if s.ScoreType == MateScore {
 		// we are winning
 		if s.Value > 0 {
@@ -43,7 +43,12 @@ func (s EngineLine) StringValue(turn TurnType) string {
 	} else if s.Value == -1 {
 		return "0.5"
 	}
-	return fmt.Sprintf("%.2f", float32(s.Value)/100.0)
+
+	v := s.Value
+	if absValue && turn == CircleTurn {
+		v = 100 - v
+	}
+	return fmt.Sprintf("%.2f", float32(v)/100.0)
 }
 
 // Struct holding information about the score value of the search
@@ -59,7 +64,7 @@ type SearchResult struct {
 func (s SearchResult) String() string {
 	if len(s.Lines) > 0 {
 		return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
-			s.Lines[0].StringValue(s.Turn), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
+			s.Lines[0].StringValue(s.Turn, false), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
 	}
 
 	return fmt.Sprintf("eval NaN depth %d nps %d nodes %d cycles %d pv empty",

@@ -13,15 +13,17 @@ import (
 )
 
 type AnalysisLine struct {
-	Eval string   `json:"eval"`
-	Pv   []string `json:"pv"`
+	Eval    string   `json:"eval"`
+	AbsEval string   `json:"abseval,omitempty"`
+	Pv      []string `json:"pv"`
 }
 
 // Simply convert pv moves to pv strings, and convert eval to a string
 func ToAnalysisLine(engineLines []uttt.EngineLine, turn uttt.TurnType) []AnalysisLine {
 	lines := make([]AnalysisLine, len(engineLines))
 	for i := range len(engineLines) {
-		lines[i].Eval = engineLines[i].StringValue(turn)
+		lines[i].Eval = engineLines[i].StringValue(turn, false)
+		lines[i].AbsEval = engineLines[i].StringValue(turn, true)
 		lines[i].Pv = make([]string, len(engineLines[i].Pv))
 		for j := range len(engineLines[i].Pv) {
 			lines[i].Pv[j] = engineLines[i].Pv[j].String()
