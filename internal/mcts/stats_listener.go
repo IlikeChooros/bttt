@@ -12,7 +12,7 @@ type ListenerTreeStats[T MoveLike] struct {
 	Maxdepth int
 	Cycles   int
 	TimeMs   int
-	Nps      uint64
+	Cps      uint32
 	Lines    []SearchLine[T]
 }
 
@@ -35,7 +35,7 @@ func toListenerStats[T MoveLike](tree *MCTS[T]) ListenerTreeStats[T] {
 		Maxdepth: int(tree.MaxDepth()),
 		Cycles:   int(tree.Root.Visits()),
 		TimeMs:   int(tree.Limiter.Elapsed()),
-		Nps:      uint64(tree.Nps()),
+		Cps:      tree.Cps(),
 	}
 }
 

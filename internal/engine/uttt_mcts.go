@@ -75,7 +75,7 @@ func ToSearchResult(stats mcts.ListenerTreeStats[PosType], turn TurnType) Search
 
 	result := SearchResult{
 		Nodes:  0,
-		Nps:    stats.Nps,
+		Cps:    stats.Cps,
 		Depth:  stats.Maxdepth,
 		Cycles: int32(stats.Cycles),
 		Lines:  make([]EngineLine, len(stats.Lines)),
@@ -115,7 +115,7 @@ func (mcts *UtttMCTS) SearchResult(pvPolicy mcts.BestChildPolicy) SearchResult {
 	multipv := mcts.MultiPv(pvPolicy)
 	result := SearchResult{
 		Nodes:  uint64(mcts.Nodes()),
-		Nps:    uint64(mcts.Nps()),
+		Cps:    mcts.Cps(),
 		Depth:  mcts.MaxDepth(),
 		Cycles: mcts.Root.Visits(),
 		Lines:  make([]EngineLine, len(multipv)),

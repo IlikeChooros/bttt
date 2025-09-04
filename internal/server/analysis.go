@@ -60,7 +60,7 @@ func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logge
 				response := AnalysisResponse{
 					Lines: ToAnalysisLine(result.Lines, result.Turn),
 					Depth: result.Depth,
-					Nps:   result.Nps,
+					Cps:   result.Cps,
 					Final: false,
 				}
 				searchResults <- response // Put it into channel queue, don't waste preciouse search time

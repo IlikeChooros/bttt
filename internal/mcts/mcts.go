@@ -199,7 +199,7 @@ type GameOperations[T MoveLike] interface {
 type TreeStats struct {
 	// size     atomic.Int32
 	maxdepth atomic.Int32
-	nps      atomic.Uint32
+	cps      atomic.Uint32
 	nodes    atomic.Uint32
 }
 
@@ -283,8 +283,8 @@ func (mcts *MCTS[T]) MaxDepth() int {
 	return int(mcts.maxdepth.Load())
 }
 
-func (mcts *MCTS[T]) Nps() uint32 {
-	return mcts.nps.Load()
+func (mcts *MCTS[T]) Cps() uint32 {
+	return mcts.cps.Load()
 }
 
 func (mcts *MCTS[T]) Nodes() uint32 {
@@ -300,8 +300,8 @@ func (mcts *MCTS[T]) Limits() *Limits {
 }
 
 func (mcts *MCTS[T]) String() string {
-	str := fmt.Sprintf("MCTS={Size=%d, Stats:{MaxDepth=%d, Nps=%d, Nodes=%d}, Stop=%v",
-		mcts.Size(), mcts.MaxDepth(), mcts.Nps(), mcts.Nodes(), !mcts.IsThinking())
+	str := fmt.Sprintf("MCTS={Size=%d, Stats:{MaxDepth=%d, cps=%d, Nodes=%d}, Stop=%v",
+		mcts.Size(), mcts.MaxDepth(), mcts.Cps(), mcts.Nodes(), !mcts.IsThinking())
 	str += fmt.Sprintf(", Root=%v, Root.Children=%v", mcts.Root, mcts.Root.Children)
 	return str
 }

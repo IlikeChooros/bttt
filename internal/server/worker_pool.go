@@ -35,7 +35,7 @@ func ToAnalysisLine(engineLines []uttt.EngineLine, turn uttt.TurnType) []Analysi
 type AnalysisResponse struct {
 	Lines []AnalysisLine `json:"lines"`
 	Depth int            `json:"depth"`
-	Nps   uint64         `json:"nps"`
+	Cps   uint32         `json:"cps"`
 	Final bool           `json:"final"`
 	Error string         `json:"error,omitempty"`
 }
@@ -242,7 +242,7 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) An
 	return AnalysisResponse{
 		Lines: ToAnalysisLine(result.Lines, engine.Position().Turn()),
 		Depth: result.Depth,
-		Nps:   result.Nps,
+		Cps:   result.Cps,
 		Final: true,
 	}
 }

@@ -87,7 +87,7 @@ func (mcts *MCTS[T]) setupSearch() {
 	// mcts.timer.Reset()
 	mcts.Limiter.Reset()
 	mcts.nodes.Store(0)
-	mcts.nps.Store(0)
+	mcts.cps.Store(0)
 	mcts.maxdepth.Store(0)
 	// mcts.stop.Store(false)
 }
@@ -120,8 +120,8 @@ func (mcts *MCTS[T]) Search(ops GameOperations[T], threadId int) {
 		// Get the result of the rollout/playout
 		mcts.Backpropagate(ops, node, ops.Rollout())
 
-		// Store the nps
-		mcts.nps.Store(mcts.nodes.Load() * 1000 / mcts.Limiter.Elapsed())
+		// Store the cps
+		mcts.cps.Store(uint32(mcts.Root.Visits()) * 1000 / mcts.Limiter.Elapsed())
 		mcts.invokeListener(mcts.listener.onCycle)
 	}
 

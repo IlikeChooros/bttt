@@ -11,7 +11,7 @@ type LimiterLike interface {
 	SetLimits(*Limits)
 	// Get the limits
 	Limits() *Limits
-	// Get elapsed time (from the last 'Reset' call)
+	// Get elapsed time in ms (from the last 'Reset' call)
 	Elapsed() uint32
 	// Set the stop signal, will cause to exit search if set to true
 	SetStop(bool)

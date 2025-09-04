@@ -55,7 +55,7 @@ func (s EngineLine) StringValue(turn TurnType, absValue bool) string {
 type SearchResult struct {
 	Lines  []EngineLine
 	Nodes  uint64
-	Nps    uint64
+	Cps    uint32
 	Depth  int
 	Cycles int32
 	Turn   TurnType
@@ -63,12 +63,12 @@ type SearchResult struct {
 
 func (s SearchResult) String() string {
 	if len(s.Lines) > 0 {
-		return fmt.Sprintf("eval %s depth %d nps %d nodes %d cycles %d pv %v",
-			s.Lines[0].StringValue(s.Turn, false), s.Depth, s.Nps, s.Nodes, s.Cycles, s.Lines[0].Pv)
+		return fmt.Sprintf("eval %s depth %d cps %d nodes %d cycles %d pv %v",
+			s.Lines[0].StringValue(s.Turn, false), s.Depth, s.Cps, s.Nodes, s.Cycles, s.Lines[0].Pv)
 	}
 
-	return fmt.Sprintf("eval NaN depth %d nps %d nodes %d cycles %d pv empty",
-		s.Depth, s.Nps, s.Nodes, s.Cycles)
+	return fmt.Sprintf("eval NaN depth %d cps %d nodes %d cycles %d pv empty",
+		s.Depth, s.Cps, s.Nodes, s.Cycles)
 }
 
 func (s SearchResult) MainLine() (EngineLine, bool) {
