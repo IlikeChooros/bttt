@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"time"
@@ -9,139 +10,116 @@ import (
 	// mine
 	uttt "uttt/internal/engine"
 	"uttt/internal/mcts"
-
-	// 3rd party
-	"github.com/gorilla/websocket"
 )
 
-var wsUpgrader = websocket.Upgrader{
-	ReadBufferSize:  2048,
-	WriteBufferSize: 2048,
-	CheckOrigin: func(r *http.Request) bool {
-		// fix in production
-		return true
-	},
-	// Add some common websocket headers by default
-	HandshakeTimeout: 10 * time.Second,
+func sseWrite(w http.ResponseWriter, data any) error {
+	bytes, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(w, "data: %s\n\n", string(bytes))
+	return nil
 }
 
-func rtAnalysis(workerPool *WorkerPool, conn *websocket.Conn, logger *slog.Logger) {
-	defer conn.Close()
+// Use SSE for real-time analysis
+func SseAnalysisHandler(workerPool *WorkerPool, logger *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 
-	for {
-		var wsRequest AnalysisRequest
-		// Read the request
-		if err := conn.ReadJSON(&wsRequest); err != nil {
-			logger.Error(err.Error())
+		// Parse the request, but use query parameters
+		req, err := NewAnalysisRequest(r, true)
+		if err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 
-		// Validate request
-		if err := wsRequest.Validate(); err != nil {
-			logger.Error(err.Error())
-			if e := conn.WriteJSON(AnalysisResponse{Error: err.Error()}); e != nil {
-				logger.Error(e.Error())
-			}
+		h := w.Header()
+		h.Set("Content-Type", "text/event-stream; charset=utf-8")
+		h.Set("Cache-Control", "no-cache, no-transform")
+		h.Set("Connection", "keep-alive")
+		h.Set("X-Accel-Buffering", "no")
+
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			http.Error(w, "Streaming unsupported", http.StatusInternalServerError)
 			return
 		}
 
-		logger.Info("rtAnalysis: new request", "data", wsRequest)
+		if err := req.Validate(); err != nil {
+			_ = sseWrite(w, AnalysisResponse{Error: err.Error()})
+			flusher.Flush()
+			return
+		}
 
-		// Setup listeners & buffered channel
-		// resultCounter := atomic.Int32{}
-		turn, _ := uttt.ReadTurn(wsRequest.Position)
-		searchResults := make(chan AnalysisResponse, DefaultConfig.Engine.MaxDepth+1)
-		wsRequest.Response = make(chan AnalysisResponse)
-		wsRequest.Kill = make(chan bool)
-		wsRequest.Listener.
+		turn, _ := uttt.ReadTurn(req.Position)
+		searchCh := make(chan AnalysisResponse, DefaultConfig.Engine.MaxDepth+1)
+		req.Listener.
 			OnDepth(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
 				result := uttt.ToSearchResult(lts, turn)
-
-				response := AnalysisResponse{
+				searchCh <- AnalysisResponse{
 					Lines: ToAnalysisLine(result.Lines, result.Turn),
 					Depth: result.Depth,
 					Cps:   result.Cps,
 					Final: false,
 				}
-				searchResults <- response // Put it into channel queue, don't waste preciouse search time
 			}).
-			OnStop(func(lts mcts.ListenerTreeStats[uttt.PosType]) {
-				close(searchResults)
+			OnStop(func(_ mcts.ListenerTreeStats[uttt.PosType]) {
+				close(searchCh)
 			})
 
-		// Submit to worker pool
-		if !workerPool.Submit(&wsRequest) {
-			if err := conn.WriteJSON(AnalysisResponse{
-				Error: "Failed to submit analysis, try again later",
-			}); err != nil {
-				logger.Error("RtAnalysis: failed to notify user on failed analysis submit")
-			}
+		if !workerPool.Submit(req) {
+			_ = sseWrite(w, AnalysisResponse{Error: "Server busy"})
+			flusher.Flush()
 			return
 		}
 
-		// Read the responses
-		for resp := range searchResults {
-			logger.Info("Sending response", "data", resp)
-			err := conn.WriteJSON(resp)
-			if err != nil {
-				logger.Error("RtAnalysis: failed finished analysis notify")
-				return
+		// Stream loop
+	Loop:
+		for {
+			select {
+			case <-r.Context().Done():
+				logger.Info("Client disconnected")
+				break Loop
+			case <-workerPool.RootCtx().Done():
+				logger.Info("Server shutting down")
+				break Loop
+			case sr, ok := <-searchCh:
+				if !ok {
+					break Loop
+				}
+				if err := sseWrite(w, sr); err != nil {
+					break Loop
+				}
+				flusher.Flush()
+			case <-time.After(DefaultConfig.Pool.JobTimeout):
+				_ = sseWrite(w, AnalysisResponse{Error: "Timeout"})
+				flusher.Flush()
+				break Loop
 			}
 		}
 
-		// Wait for the response
+		// Final response if available
 		select {
-		case resp := <-wsRequest.Response: // final response
-			logger.Info("Sending last response", "data", resp)
-			err := conn.WriteJSON(resp)
-			if err != nil {
-				logger.Error("RtAnalysis: failed finished analysis notify")
-				return
-			}
-		case <-time.After(DefaultConfig.Pool.JobTimeout):
-			if err := conn.WriteJSON(AnalysisResponse{Error: "Analysis timeout"}); err != nil {
-				logger.Error("RtAnalysis: failed analysis timeout notify")
-			}
-			return
+		case final := <-req.Response:
+			final.Final = true
+			_ = sseWrite(w, final)
+			flusher.Flush()
+		default:
 		}
-	}
-}
-
-func WsAnalysisHandler(workerPool *WorkerPool, logger *slog.Logger) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		logger.Info("WebSocket connection attempt", "remote", r.RemoteAddr, "headers", r.Header)
-
-		conn, err := wsUpgrader.Upgrade(w, r, nil)
-
-		if err != nil {
-			logger.Error("WebSocket upgrade failed", "error", err)
-			http.Error(w, "Failed to establish websocket: "+err.Error(), http.StatusBadRequest)
-			return
-		}
-
-		logger.Info("WebSocket connection established", "remote", r.RemoteAddr)
-
-		// Handle real-time analysis in parallel
-		go rtAnalysis(workerPool, conn, logger)
 	}
 }
 
 func AnalysisHandler(workerPool *WorkerPool, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var req AnalysisRequest
-
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON", http.StatusBadRequest)
+		req, err := NewAnalysisRequest(r, false)
+		if err != nil {
+			http.Error(w, "Invalid request", http.StatusBadRequest)
 			return
 		}
 
-		logger.Info("New post analysis", "req=", req)
-
-		req.Response = make(chan AnalysisResponse, 1)
-		req.Kill = make(chan bool)
+		logger.Info("New post analysis", "req=", req.String())
 
 		// Try submitting the request
-		if !workerPool.Submit(&req) {
+		if !workerPool.Submit(req) {
 			http.Error(w, "Server is too busy", http.StatusServiceUnavailable)
 			return
 		}

@@ -23,6 +23,9 @@ func main() {
 	// Create new logger
 	logger := server.NewLogger()
 
+	// Print the config
+	logger.Info(fmt.Sprintf("Config: %s", server.DefaultConfig.String()))
+
 	// Set the parameters for worker pool
 	logger.Info(fmt.Sprintf(
 		"Starting the worker pool: workers=%d, queueSize=%d",
@@ -33,24 +36,25 @@ func main() {
 	ctx := context.Background()
 	workerPool = server.NewWorkerPool(
 		server.DefaultConfig.Pool.DefaultWorkers,
-		server.DefaultConfig.Pool.DefaultQueueSize)
-	workerPool.Start(ctx)
+		server.DefaultConfig.Pool.DefaultQueueSize,
+		ctx)
+	workerPool.Start()
 
 	// Create new router
 	router := mux.NewRouter()
-	router.Use(server.CorsMiddleware)
 	router.Use(server.TracingMiddleware)
 	router.Use(server.LoggingMiddleware(logger))
+	router.Use(server.CorsMiddleware)
 	router.Use(server.RateLimiterMiddleware(logger))
 	router.Use(server.MetricsMiddleware)
 
 	// API endpoints
-	router.HandleFunc("/analysis", server.AnalysisHandler(workerPool, logger))      // analyze given position, up to 1 second for request
-	router.HandleFunc("/rt-analysis", server.WsAnalysisHandler(workerPool, logger)) // real-time analysis only with websocket connection
-	router.HandleFunc("/limits", server.LimitsHandler())                            // get current engine limits for the frontend
-	router.HandleFunc("/health", server.HealthHandler(workerPool))                  // more in-depth health of the server
-	router.HandleFunc("/healthz", server.HealthzHandler())                          // either 204 or 503 response
-	router.HandleFunc("/metrics", server.MetricsHandler())                          // memory usage, pool usage and other stats
+	router.HandleFunc("/api/analysis", server.AnalysisHandler(workerPool, logger))       // analyze given position, up to 1 second for request
+	router.HandleFunc("/api/rt-analysis", server.SseAnalysisHandler(workerPool, logger)) // real-time analysis only with websocket connection
+	router.HandleFunc("/api/limits", server.LimitsHandler())                             // get current engine limits for the frontend
+	router.HandleFunc("/api/health", server.HealthHandler(workerPool))                   // more in-depth health of the server
+	router.HandleFunc("/api/healthz", server.HealthzHandler())                           // either 204 or 503 response
+	router.HandleFunc("/api/metrics", server.MetricsHandler())                           // memory usage, pool usage and other stats
 
 	srv := &http.Server{
 		Addr:         ":" + server.DefaultConfig.Server.Port,

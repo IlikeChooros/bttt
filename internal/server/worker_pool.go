@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,16 +48,65 @@ type AnalysisRequest struct {
 	Threads  int                              `json:"threads"`
 	SizeMb   int                              `json:"sizemb"`
 	MultiPv  int                              `json:"multipv"`
+	Ctx      context.Context                  `json:"-"`
 	Response chan AnalysisResponse            `json:"-"`
 	Listener mcts.StatsListener[uttt.PosType] `json:"-"`
-	Kill     chan bool                        `json:"-"`
 }
 
-func (r AnalysisRequest) Validate() error {
+func NewAnalysisRequest(r *http.Request, useQuery bool) (*AnalysisRequest, error) {
+	var req AnalysisRequest
+
+	atoi := func(s string, def int) int {
+		if s == "" {
+			return def
+		}
+		var v int
+		_, err := fmt.Sscanf(s, "%d", &v)
+		if err != nil {
+			return def
+		}
+		return v
+	}
+
+	if useQuery {
+		q := r.URL.Query()
+		req.Position = strings.ReplaceAll(
+			strings.ReplaceAll(q.Get("position"), "n", "/"),
+			"_", " ",
+		)
+		req.Movetime = atoi(q.Get("movetime"), 0)
+		req.Depth = atoi(q.Get("depth"), 0)
+		req.Threads = atoi(q.Get("threads"), 0)
+		req.SizeMb = atoi(q.Get("sizemb"), 0)
+		req.MultiPv = atoi(q.Get("multipv"), 0)
+	} else {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return nil, fmt.Errorf("failed to decode request body: %w", err)
+		}
+	}
+
+	req.Ctx = r.Context()
+	req.Response = make(chan AnalysisResponse)
+	req.Listener = mcts.StatsListener[uttt.PosType]{}
+	return &req, nil
+}
+
+func (r *AnalysisRequest) Validate() error {
 	validator := func(value int, min int, max int, name string) error {
 		if value < min || value > max {
 			return fmt.Errorf("Invalid %s value: %d, expected between %d-%d", name, value, min, max)
 		}
+		return nil
+	}
+
+	// Check if that's a 'default' request
+	if r.Position != "" && r.Movetime == 0 && r.Depth == 0 && r.Threads == 0 && r.SizeMb == 0 && r.MultiPv == 0 {
+		// Set default values
+		r.Movetime = DefaultConfig.Engine.MaxMovetime
+		r.Depth = DefaultConfig.Engine.MaxDepth
+		r.Threads = DefaultConfig.Engine.Threads
+		r.SizeMb = DefaultConfig.Engine.MaxSizeMb
+		r.MultiPv = 1
 		return nil
 	}
 
@@ -94,23 +144,29 @@ type WorkerPool struct {
 	activeJobs  atomic.Int64
 	pendingJobs atomic.Int64
 	refusedJobs atomic.Int64
+	ctx         context.Context
 }
 
-func NewWorkerPool(workers int, queueSize int) *WorkerPool {
+func NewWorkerPool(workers int, queueSize int, ctx context.Context) *WorkerPool {
 	wp := &WorkerPool{
 		workers:  workers,
 		jobQueue: make(chan *AnalysisRequest, queueSize),
 		wg:       sync.WaitGroup{},
 		quit:     make(chan struct{}),
+		ctx:      ctx,
 	}
 	return wp
 }
 
+func (wp *WorkerPool) RootCtx() context.Context {
+	return wp.ctx
+}
+
 // Start the worker pool, submit new requests with `Submit` method
-func (wp *WorkerPool) Start(ctx context.Context) {
+func (wp *WorkerPool) Start() {
 	for i := range wp.workers {
 		wp.wg.Add(1)
-		go wp.worker(i, ctx)
+		go wp.worker(i)
 	}
 }
 
@@ -147,7 +203,7 @@ func (wp *WorkerPool) RefusedJobs() int64 {
 	return wp.refusedJobs.Load()
 }
 
-func (wp *WorkerPool) worker(id int, ctx context.Context) {
+func (wp *WorkerPool) worker(id int) {
 	// Main worker thread
 	defer wp.wg.Done()
 
@@ -159,7 +215,7 @@ func (wp *WorkerPool) worker(id int, ctx context.Context) {
 		case req := <-wp.jobQueue:
 			// fmt.Println("Processing by", id)
 			wp.processJobWithMetrics(engine, req)
-		case <-ctx.Done():
+		case <-wp.ctx.Done():
 			return
 		case <-wp.quit:
 			return
@@ -168,10 +224,14 @@ func (wp *WorkerPool) worker(id int, ctx context.Context) {
 }
 
 // A simple timeout funciton, call engine.Stop() after MaxMovetime elapses, else does nothing
-func searchTimeout(done chan bool, engine *uttt.Engine) {
+func searchTimeout(ctx context.Context, req *AnalysisRequest, engine *uttt.Engine) {
 	select {
-	case <-done:
-		return
+	// Background context canceled
+	case <-ctx.Done():
+		engine.Stop()
+		// Request context canceled
+	case <-req.Ctx.Done():
+		engine.Stop()
 	case <-time.After(time.Duration(DefaultConfig.Engine.MaxMovetime) * time.Millisecond):
 		engine.Stop()
 	}
@@ -203,7 +263,7 @@ func getAnalysisLimits(req *AnalysisRequest) *mcts.Limits {
 }
 
 // Handle engine search
-func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) AnalysisResponse {
+func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) error {
 	// Decrement the counter
 	defer wp.activeJobs.Add(-1)
 
@@ -219,9 +279,10 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) An
 
 	// Sets new position, also resets the engine state
 	if err := engine.SetNotation(notation); err != nil {
-		return AnalysisResponse{
+		req.Response <- AnalysisResponse{
 			Error: "Invalid position notation",
 		}
+		return fmt.Errorf("Invalid position notation: %s", notation)
 	}
 
 	// Get the limits and attach new listener
@@ -230,19 +291,19 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) An
 	*engine.Mcts().StatsListener() = req.Listener
 
 	// Use here a timeout
-	go searchTimeout(req.Kill, engine)
+	go searchTimeout(wp.ctx, req, engine)
 
 	// Search, and return the result
 	engine.SetLimits(limits)
 	result := engine.Think()
 
-	close(req.Kill)
-
 	// Set the response object
-	return AnalysisResponse{
+	req.Response <- AnalysisResponse{
 		Lines: ToAnalysisLine(result.Lines, engine.Position().Turn()),
 		Depth: result.Depth,
 		Cps:   result.Cps,
 		Final: true,
 	}
+
+	return nil
 }

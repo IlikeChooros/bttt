@@ -69,11 +69,9 @@ func (wp *WorkerPool) processJobWithMetrics(engine *uttt.Engine, req *AnalysisRe
 	defer close(req.Response)
 
 	ServerMetrics.AnalysisTotal.Add(1)
-	resp := wp.handleSearch(req, engine)
+	err := wp.handleSearch(req, engine)
 
-	if resp.Error != "" {
+	if err != nil {
 		ServerMetrics.AnalysisErrors.Add(1)
 	}
-
-	req.Response <- resp
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 	"uttt/internal/mcts"
@@ -11,26 +12,34 @@ import (
 )
 
 type Config struct {
-	Server ServerConfig
-	Pool   PoolConfig
-	Engine EngineConfig
-	Rate   RateLimitConfig
+	Server ServerConfig    `json:"server"`
+	Pool   PoolConfig      `json:"pool"`
+	Engine EngineConfig    `json:"engine"`
+	Rate   RateLimitConfig `json:"rate"`
+}
+
+func (c Config) String() string {
+	json, err := json.Marshal(c)
+	if err != nil {
+		return "Failed to marshal config"
+	}
+	return string(json)
 }
 
 // Server config
 type ServerConfig struct {
-	AllowedOrigins  string // Access-Control-Allow-Origin header value, by default "*"
-	Port            string
-	ReadTimeout     time.Duration
-	WriteTimeout    time.Duration
-	ShutdownTimeout time.Duration
+	AllowedOrigins  string        `json:"allowed_origins"` // Access-Control-Allow-Origin header value, by default "*"
+	Port            string        `json:"port"`
+	ReadTimeout     time.Duration `json:"read_timeout"`
+	WriteTimeout    time.Duration `json:"write_timeout"`
+	ShutdownTimeout time.Duration `json:"shutdown_timeout"`
 }
 
 // Pool config
 type PoolConfig struct {
-	DefaultWorkers   int           // number of 'engines' to run asynchornously
-	DefaultQueueSize int           // number of possible requests
-	JobTimeout       time.Duration // Time after which the analysis will be timedout
+	DefaultWorkers   int           `json:"default_workers"`    // number of 'engines' to run asynchornously
+	DefaultQueueSize int           `json:"default_queue_size"` // number of possible requests
+	JobTimeout       time.Duration `json:"job_timeout"`        // Time after which the analysis will be timedout
 }
 
 // Engine config
@@ -44,8 +53,8 @@ type EngineConfig struct {
 }
 
 type RateLimitConfig struct {
-	RequestsPerSecond rate.Limit
-	Burst             int
+	RequestsPerSecond rate.Limit `json:"requests_per_second"`
+	Burst             int        `json:"burst"`
 }
 
 // Default configs
@@ -70,7 +79,7 @@ func LoadConfig() {
 		Pool: PoolConfig{
 			DefaultWorkers:   utils.GetEnvInt("WORKERS", 4),
 			DefaultQueueSize: utils.GetEnvInt("QUEUE_SIZE", 100),
-			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 10*time.Second),
+			JobTimeout:       utils.GetEnvDuration("JOB_TIMEOUT", 5*time.Second),
 		},
 		Engine: EngineConfig{
 			DefaultLimits: *mcts.DefaultLimits(),
