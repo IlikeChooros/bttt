@@ -1,12 +1,10 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 	uttt "uttt/_pkg/engine"
 	"uttt/_pkg/mcts"
@@ -15,93 +13,6 @@ import (
 type SseAnalysisRequest struct {
 	AnalysisRequest
 	ConnId string `json:"connId"`
-}
-
-type AnalysisEvent struct {
-	AnalysisResponse
-}
-
-type Client struct {
-	ConnId string
-	UserId string
-	Events chan AnalysisEvent
-	ctx    context.Context
-	cancel context.CancelFunc
-}
-
-type ConnManager struct {
-	mu      sync.RWMutex
-	clients map[string]map[string]*Client // map[userId]map[connId]Client
-}
-
-func NewConnManager() *ConnManager {
-	return &ConnManager{
-		clients: make(map[string]map[string]*Client),
-	}
-}
-
-func (cm *ConnManager) Get(userId, connId string) *Client {
-	cm.mu.RLock()
-	defer cm.mu.RUnlock()
-
-	if clients, exists := cm.clients[userId]; exists {
-		if client, ok := clients[connId]; ok {
-			return client
-		}
-	}
-	return nil
-}
-
-func (cm *ConnManager) Subscribe(userId, connId string) *Client {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	// User may already exist (multiple tabs open)
-	if _, exists := cm.clients[userId]; !exists {
-		cm.clients[userId] = make(map[string]*Client)
-	}
-
-	ctx, cancel := context.WithCancel(context.Background())
-	client := &Client{
-		ConnId: connId,
-		UserId: userId,
-		Events: make(chan AnalysisEvent, DefaultConfig.Engine.MaxDepth+1),
-		ctx:    ctx,
-		cancel: cancel,
-	}
-	cm.clients[userId][connId] = client
-	return client
-}
-
-func (cm *ConnManager) Unsubscribe(userId, connId string) {
-	cm.mu.Lock()
-	defer cm.mu.Unlock()
-
-	if clients, exists := cm.clients[userId]; exists {
-
-		// Close and remove this connection
-		if conn, ok := clients[connId]; ok && conn != nil {
-			delete(clients, connId)
-			close(conn.Events)
-			conn.cancel()
-		}
-
-		// This user has no more connections, remove the user entry
-		if len(clients) == 0 {
-			delete(cm.clients, userId)
-		}
-	}
-}
-
-func (cm *ConnManager) Publish(userId, connId string, event AnalysisEvent) {
-	c := cm.Get(userId, connId)
-	if c != nil {
-		select {
-		case c.Events <- event:
-		default:
-			// Drop the event if the channel is full
-		}
-	}
 }
 
 func SseSend(w http.ResponseWriter, event string, v any) {
@@ -128,6 +39,10 @@ func SseSend(w http.ResponseWriter, event string, v any) {
 
 // On GET, register this user and connection ID, then return the initial
 // SSE response headers, and keep the connection open for possible events
+// It will send 3 types of events:
+// 1. "connected" - sent once when the connection is established, with the connection ID
+// 2. "analysis" - sent whenever there is a new analysis result
+// 3. "ping" - sent every 30 seconds to keep the connection alive
 func StableSSEHandler(cm *ConnManager, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// auth the user

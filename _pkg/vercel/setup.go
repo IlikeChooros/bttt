@@ -10,22 +10,31 @@ import (
 var (
 	once sync.Once
 	pool *server.WorkerPool
+	cm   *server.ConnManager
 )
 
 func InitOnce() {
 	once.Do(func() {
 		uttt.Init()
+		server.InitAuth()
 		server.LoadConfig()
+		cm = server.NewConnManager()
 		ctx := context.Background()
 		pool = server.NewWorkerPool(
 			server.DefaultConfig.Pool.DefaultWorkers,
 			server.DefaultConfig.Pool.DefaultQueueSize,
+			ctx,
 		)
-		pool.Start(ctx)
+		pool.Start()
 	})
 }
 
 func GetPool() *server.WorkerPool {
 	InitOnce()
 	return pool
+}
+
+func GetConnManager() *server.ConnManager {
+	InitOnce()
+	return cm
 }

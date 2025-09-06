@@ -16,10 +16,10 @@ import (
 var workerPool *server.WorkerPool
 
 func main() {
+
 	// Initialize the ultimate tic tac toe lib
 	uttt.Init()
 	server.LoadConfig()
-
 	server.InitAuth()
 
 	// Initialize the connection manager for SSE

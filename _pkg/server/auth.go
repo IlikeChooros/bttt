@@ -3,6 +3,7 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/sessions"
 )
@@ -11,7 +12,7 @@ var CookieStore *sessions.CookieStore = nil
 
 func InitAuth() {
 	// In production, use a secure random key and keep it secret
-	CookieStore = sessions.NewCookieStore([]byte("super-secret-key"))
+	CookieStore = sessions.NewCookieStore([]byte(os.Getenv("SESSION_KEY")))
 }
 
 func Authenticate(r *http.Request) (string, error) {
