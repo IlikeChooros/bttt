@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"uttt/internal/mcts"
+	"uttt/_pkg/mcts"
 )
 
 type Cli struct {

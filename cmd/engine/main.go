@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	uttt "uttt/internal/engine"
-	"uttt/internal/mcts"
+	uttt "uttt/_pkg/engine"
+	"uttt/_pkg/mcts"
 )
 
 func main() {

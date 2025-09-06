@@ -7,8 +7,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	uttt "uttt/internal/engine"
-	"uttt/internal/server"
+	uttt "uttt/_pkg/engine"
+	"uttt/_pkg/server"
 
 	"github.com/gorilla/mux"
 )
@@ -19,6 +19,11 @@ func main() {
 	// Initialize the ultimate tic tac toe lib
 	uttt.Init()
 	server.LoadConfig()
+
+	server.InitAuth()
+
+	// Initialize the connection manager for SSE
+	cm := server.NewConnManager()
 
 	// Create new logger
 	logger := server.NewLogger()
@@ -49,12 +54,13 @@ func main() {
 	router.Use(server.MetricsMiddleware)
 
 	// API endpoints
-	router.HandleFunc("/api/analysis", server.AnalysisHandler(workerPool, logger))       // analyze given position, up to 1 second for request
-	router.HandleFunc("/api/rt-analysis", server.SseAnalysisHandler(workerPool, logger)) // real-time analysis only with websocket connection
-	router.HandleFunc("/api/limits", server.LimitsHandler())                             // get current engine limits for the frontend
-	router.HandleFunc("/api/health", server.HealthHandler(workerPool))                   // more in-depth health of the server
-	router.HandleFunc("/api/healthz", server.HealthzHandler())                           // either 204 or 503 response
-	router.HandleFunc("/api/metrics", server.MetricsHandler())                           // memory usage, pool usage and other stats
+	router.HandleFunc("/api/analysis", server.AnalysisHandler(workerPool, logger))                          // analyze given position, up to 1 second for request
+	router.HandleFunc("/api/rt-analysis", server.StableSSEHandler(cm, logger)).Methods("GET")               // create a stable SSE connection for real-time analysis
+	router.HandleFunc("/api/rt-analysis", server.AnalysisSSESubmit(workerPool, cm, logger)).Methods("POST") // post analysis request tied to the SSE connection
+	router.HandleFunc("/api/limits", server.LimitsHandler())                                                // get current engine limits for the frontend
+	router.HandleFunc("/api/health", server.HealthHandler(workerPool))                                      // more in-depth health of the server
+	router.HandleFunc("/api/healthz", server.HealthzHandler())                                              // either 204 or 503 response
+	router.HandleFunc("/api/metrics", server.MetricsHandler())                                              // memory usage, pool usage and other stats
 
 	srv := &http.Server{
 		Addr:         ":" + server.DefaultConfig.Server.Port,

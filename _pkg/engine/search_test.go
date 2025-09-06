@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
-	"uttt/internal/mcts"
+	"uttt/_pkg/mcts"
 )
 
 func TestMates(t *testing.T) {

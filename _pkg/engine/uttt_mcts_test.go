@@ -6,7 +6,7 @@ import (
 	"math/rand"
 	"strings"
 	"testing"
-	"uttt/internal/mcts"
+	"uttt/_pkg/mcts"
 )
 
 func TestMCTSBasicFunctionality(t *testing.T) {

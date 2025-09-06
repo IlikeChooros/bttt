@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	uttt "uttt/internal/engine"
+	uttt "uttt/_pkg/engine"
 )
 
 type Metrics struct {

@@ -3,7 +3,7 @@ package uttt
 import (
 	"math/rand"
 	"time"
-	"uttt/internal/mcts"
+	"uttt/_pkg/mcts"
 )
 
 // Actual UTTT mcts implementation

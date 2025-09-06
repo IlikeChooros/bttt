@@ -9,8 +9,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-	uttt "uttt/internal/engine"
-	"uttt/internal/mcts"
+	uttt "uttt/_pkg/engine"
+	"uttt/_pkg/mcts"
 )
 
 type AnalysisLine struct {
@@ -41,16 +41,23 @@ type AnalysisResponse struct {
 	Error string         `json:"error,omitempty"`
 }
 
+type BaseAnalysisRequest struct {
+	Position string `json:"position"`
+	Movetime int    `json:"movetime,omitempty"`
+	Depth    int    `json:"depth,omitempty"`
+	Threads  int    `json:"threads,omitempty"`
+	SizeMb   int    `json:"sizemb,omitempty"`
+	MultiPv  int    `json:"multipv,omitempty"`
+}
+
 type AnalysisRequest struct {
-	Position string                           `json:"position"`
-	Movetime int                              `json:"movetime"`
-	Depth    int                              `json:"depth"`
-	Threads  int                              `json:"threads"`
-	SizeMb   int                              `json:"sizemb"`
-	MultiPv  int                              `json:"multipv"`
-	Ctx      context.Context                  `json:"-"`
-	Response chan AnalysisResponse            `json:"-"`
-	Listener mcts.StatsListener[uttt.PosType] `json:"-"`
+	BaseAnalysisRequest
+	// If true, it won't publish the final response the 'Response' channel, used in SSE
+	PublishLastWithStop bool                             `json:"-"`
+	JobId               string                           `json:"jobId,omitempty"`
+	Ctx                 context.Context                  `json:"-"`
+	Response            chan AnalysisResponse            `json:"-"`
+	Listener            mcts.StatsListener[uttt.PosType] `json:"-"`
 }
 
 func NewAnalysisRequest(r *http.Request, useQuery bool) (*AnalysisRequest, error) {
@@ -85,6 +92,7 @@ func NewAnalysisRequest(r *http.Request, useQuery bool) (*AnalysisRequest, error
 		}
 	}
 
+	req.JobId = RandID(16)
 	req.Ctx = r.Context()
 	req.Response = make(chan AnalysisResponse)
 	req.Listener = mcts.StatsListener[uttt.PosType]{}
@@ -298,6 +306,12 @@ func (wp *WorkerPool) handleSearch(req *AnalysisRequest, engine *uttt.Engine) er
 	result := engine.Think()
 
 	// Set the response object
+	if req.PublishLastWithStop {
+		// If using SSE, the final response is sent with the 'stop' event
+		close(req.Response)
+		return nil
+	}
+
 	req.Response <- AnalysisResponse{
 		Lines: ToAnalysisLine(result.Lines, engine.Position().Turn()),
 		Depth: result.Depth,

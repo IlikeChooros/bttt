@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-	"uttt/internal/mcts"
-	"uttt/internal/utils"
+	"uttt/_pkg/mcts"
+	"uttt/_pkg/utils"
 
 	"github.com/joho/godotenv"
 	"golang.org/x/time/rate"

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	engine "uttt/internal/engine"
-	"uttt/internal/mcts"
+	engine "uttt/_pkg/engine"
+	"uttt/_pkg/mcts"
 )
 
 // Manager handles user input and coordinates the engine and UI rendering.

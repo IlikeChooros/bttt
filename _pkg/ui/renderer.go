@@ -2,7 +2,7 @@ package ui
 
 import (
 	"fmt"
-	uttt "uttt/internal/engine"
+	uttt "uttt/_pkg/engine"
 )
 
 // UltimateBoard represents a 9x9 board for Ultimate Tic Tac Toe.

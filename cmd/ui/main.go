@@ -1,7 +1,7 @@
 package main
 
 import (
-	ui "uttt/internal/ui"
+	ui "uttt/_pkg/ui"
 )
 
 func main() {

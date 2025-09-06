@@ -1,7 +1,7 @@
 package uttt
 
 import (
-	"uttt/internal/mcts"
+	"uttt/_pkg/mcts"
 )
 
 /*
