@@ -46,7 +46,7 @@ func SseSend(w http.ResponseWriter, event string, v any) {
 func StableSSEHandler(cm *ConnManager, logger *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// auth the user
-		userId, err := Authenticate(r)
+		userId, err := Authenticate(w, r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -90,7 +90,7 @@ func AnalysisSSESubmit(workerPool *WorkerPool, cm *ConnManager, logger *slog.Log
 	return func(w http.ResponseWriter, r *http.Request) {
 
 		// auth the user
-		userId, err := Authenticate(r)
+		userId, err := Authenticate(w, r)
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return

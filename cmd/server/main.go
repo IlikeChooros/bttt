@@ -54,13 +54,27 @@ func main() {
 	router.Use(server.MetricsMiddleware)
 
 	// API endpoints
-	router.HandleFunc("/api/analysis", server.AnalysisHandler(workerPool, logger))                          // analyze given position, up to 1 second for request
-	router.HandleFunc("/api/rt-analysis", server.StableSSEHandler(cm, logger)).Methods("GET")               // create a stable SSE connection for real-time analysis
-	router.HandleFunc("/api/rt-analysis", server.AnalysisSSESubmit(workerPool, cm, logger)).Methods("POST") // post analysis request tied to the SSE connection
-	router.HandleFunc("/api/limits", server.LimitsHandler())                                                // get current engine limits for the frontend
-	router.HandleFunc("/api/health", server.HealthHandler(workerPool))                                      // more in-depth health of the server
-	router.HandleFunc("/api/healthz", server.HealthzHandler())                                              // either 204 or 503 response
-	router.HandleFunc("/api/metrics", server.MetricsHandler())                                              // memory usage, pool usage and other stats
+
+	// analyze given position, up to 1 second for request
+	router.HandleFunc("/api/analysis", server.AnalysisHandler(workerPool, logger))
+
+	// Create a stable SSE connection for real-time analysis, it works as follows:
+	// On GET, register this user and connection ID, then return the initial SSE response headers,
+	// and keep the connection open for possible events
+	// It will send 3 types of events:
+	// 1. "connected" - sent once when the connection is established, with the connection ID
+	// 2. "analysis" - sent whenever there is a new analysis result
+	// 3. "ping" - sent every 30 seconds to keep the connection alive
+	// On POST, submit an analysis request tied to this user and connection ID, thus the
+	// analysis results will be sent to the corresponding SSE connection
+	router.HandleFunc("/api/rt-analysis", server.StableSSEHandler(cm, logger)).Methods("GET")
+
+	// post analysis request tied to the SSE connection
+	router.HandleFunc("/api/rt-analysis", server.AnalysisSSESubmit(workerPool, cm, logger)).Methods("POST")
+	router.HandleFunc("/api/limits", server.LimitsHandler())           // get current engine limits for the frontend
+	router.HandleFunc("/api/health", server.HealthHandler(workerPool)) // more in-depth health of the server
+	router.HandleFunc("/api/healthz", server.HealthzHandler())         // either 204 or 503 response
+	router.HandleFunc("/api/metrics", server.MetricsHandler())         // memory usage, pool usage and other stats
 
 	srv := &http.Server{
 		Addr:         ":" + server.DefaultConfig.Server.Port,
